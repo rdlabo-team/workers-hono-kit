@@ -32,8 +32,12 @@
   },
   "files": [
     "src",
+    "scripts",
     "!src/**/*.spec.ts"
   ],
+  "bin": {
+    "hono-kit-sync-dev-aws": "./scripts/sync-dev-aws.mjs"
+  },
   "exports": {
     ".": {
       "types": "./src/index.ts",
