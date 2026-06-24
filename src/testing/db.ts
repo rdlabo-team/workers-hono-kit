@@ -70,9 +70,15 @@ export function createTestDb(options: CreateTestDbOptions): TestDb {
     },
 
     createTestPool(): Pool {
-      // decimalNumbers: true mirrors the runtime hyperdriveConnectionOptions so
-      // specs read DECIMAL columns as numbers (not strings), matching production.
-      return createPool({ ...connection, database: dbName, connectionLimit: 5, decimalNumbers: true });
+      // decimalNumbers / timezone mirror the runtime hyperdriveConnectionOptions so specs read
+      // DECIMAL columns as numbers and handle datetime in +09:00 (JST), matching production.
+      return createPool({
+        ...connection,
+        database: dbName,
+        connectionLimit: 5,
+        decimalNumbers: true,
+        timezone: '+09:00',
+      });
     },
 
     async truncateAll(pool: Pool): Promise<void> {

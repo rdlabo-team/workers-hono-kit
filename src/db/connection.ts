@@ -20,6 +20,12 @@ export interface HyperdriveLike {
  * `$inferSelect`（decimal→string）と生 SQL reads の戻り値を、各 repo の数値ドメイン型
  * （nutrition の number 等）に揃えるため既定で有効化。precision/scale が JS の安全整数域
  * （decimal(15,2) 程度まで）を超える列が無いことが前提。
+ *
+ * `timezone: '+09:00'`: フリートの接続先 RDB は session time_zone=Asia/Tokyo。mysql2 の driver
+ * `timezone` 既定は `'local'`＝Workers では UTC で、揃わないと `datetime/timestamp` の生 Date 読みが
+ * +9h・生 Date 書きが −9h ズレる（NestJS は JST 実行で一致＝移植で顕在化する潜在バグ）。driver を
+ * 固定すれば round-trip の観測値は DB の session tz に非依存（内部格納 UTC 値だけ変わるが app 不可視）。
+ * 非 JST repo は `extra: { timezone: '...' }` で上書き可。
  */
 export function hyperdriveConnectionOptions(
   hyperdrive: HyperdriveLike,
@@ -33,6 +39,7 @@ export function hyperdriveConnectionOptions(
     port: hyperdrive.port,
     disableEval: true,
     decimalNumbers: true,
+    timezone: '+09:00',
     ...extra,
   };
 }

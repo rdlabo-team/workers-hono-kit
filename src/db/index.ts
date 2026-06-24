@@ -20,3 +20,5 @@ export type { DzWriteResult } from './write-result';
 
 export { hyperdriveConnectionOptions, withMysqlConnections } from './connection';
 export type { HyperdriveLike, ExecutionContextLike } from './connection';
+
+export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst';
