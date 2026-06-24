@@ -38,6 +38,10 @@ export type { CreateStripeClientOptions } from './stripe/client';
 // db
 export { retryWhenDeadlock } from './db/retry';
 
+// ai
+export { createAiGatewayProvider } from './ai/gateway';
+export type { AiGatewayConfig, AiGatewayProvider, AiGatewayBinding, AiGateway, AiGatewayOptions } from './ai/gateway';
+
 // aws
 export { getAuthenticationSecret } from './aws/secrets-manager';
 export type { AwsSecretsOptions } from './aws/secrets-manager';
