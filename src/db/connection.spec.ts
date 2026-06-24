@@ -25,6 +25,7 @@ describe('hyperdriveConnectionOptions', () => {
       port: 3306,
       disableEval: true,
       decimalNumbers: true,
+      timezone: '+09:00',
     });
   });
 
