@@ -22,3 +22,6 @@ export { hyperdriveConnectionOptions, withMysqlConnections } from './connection'
 export type { HyperdriveLike, ExecutionContextLike } from './connection';
 
 export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst';
+
+export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig } from './orm-config';
+export type { HonoDrizzleConfigOptions } from './orm-config';
