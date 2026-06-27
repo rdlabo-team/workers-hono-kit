@@ -53,4 +53,10 @@ describe('verifyStripeWebhook', () => {
     const tampered = payload.replace('evt_123', 'evt_evil');
     await expect(verifyStripeWebhook(apiKey, webhookSecret, tampered, sig)).rejects.toThrow();
   });
+
+  it('異なる secret で署名されたものは検証に失敗する', async () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sigWithWrongSecret = await stripeSignatureHeader(payload, 'whsec_wrong_secret', ts);
+    await expect(verifyStripeWebhook(apiKey, webhookSecret, payload, sigWithWrongSecret)).rejects.toThrow();
+  });
 });
