@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -46,6 +46,9 @@ jobs:
         env:
           CI: true
 
+      - name: Build
+        run: npm run build
+
       - name: Publish package
         run: |
           VERSION="${{ steps.tag_version.outputs.version }}"
@@ -57,5 +60,3 @@ jobs:
           else
             npm publish --provenance --access public --tag next
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

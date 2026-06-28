@@ -1,4 +1,4 @@
-// @rdlabo/hono-kit — フリート共通のインフラ層ヘルパ（receptray / winecode / foodlabel）。
+// @rdlabo/workers-hono-kit — フリート共通のインフラ層ヘルパ（receptray / winecode / foodlabel）。
 // ドメイン・DB・各 repo 固有の parity 差異（auth エラー status/body、secretId、Secret スキーマ）は
 // 各 repo 側に残し、ここには「設定注入で汎用化できるインフラ」だけを置く。
 

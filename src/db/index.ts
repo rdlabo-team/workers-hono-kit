@@ -1,4 +1,4 @@
-// @rdlabo/hono-kit/db — mysql2 依存のデータ層ヘルパ（ルート `.` は web 標準のみのため別サブパス）。
+// @rdlabo/workers-hono-kit/db — mysql2 依存のデータ層ヘルパ（ルート `.` は web 標準のみのため別サブパス）。
 // drizzle-orm の型同一性には依存しない（orm は消費側が渡す）。
 
 export { retryWhenDeadlock } from './retry';

@@ -1,19 +1,22 @@
 {
-  "name": "@rdlabo/hono-kit",
-  "version": "0.0.0",
+  "name": "@rdlabo/workers-hono-kit",
+  "version": "0.1.0",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "description": "Infrastructure toolkit for building APIs on Hono + Cloudflare Workers: Firebase ID-token verification (jose), AWS Secrets Manager (aws4fetch), ETag/validation/zod-coerce middleware, deadlock retry, and shared HTTP helpers.",
   "author": "Masahiko Sakakibara<sakakibara@rdlabo.jp>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rdlabo-team/hono-kit.git"
+    "url": "git+https://github.com/rdlabo-team/workers-hono-kit.git"
   },
   "bugs": {
-    "url": "https://github.com/rdlabo-team/hono-kit/issues"
+    "url": "https://github.com/rdlabo-team/workers-hono-kit/issues"
   },
-  "homepage": "https://github.com/rdlabo-team/hono-kit#readme",
+  "homepage": "https://github.com/rdlabo-team/workers-hono-kit#readme",
   "keywords": [
     "hono",
     "cloudflare-workers",
@@ -37,7 +40,7 @@
     "!src/**/*.spec.ts"
   ],
   "bin": {
-    "hono-kit-sync-dev-aws": "./scripts/sync-dev-aws.mjs"
+    "workers-hono-kit-sync-dev-aws": "./scripts/sync-dev-aws.mjs"
   },
   "exports": {
     ".": {
@@ -65,7 +68,8 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "release": "np --no-tests --no-publish"
   },
   "peerDependencies": {
     "@hono/zod-validator": "^0.8.0",
@@ -80,11 +84,21 @@
     "zod": "^4.4.0"
   },
   "peerDependenciesMeta": {
-    "ai": { "optional": true },
-    "ai-gateway-provider": { "optional": true },
-    "stripe": { "optional": true },
-    "drizzle-orm": { "optional": true },
-    "mysql2": { "optional": true }
+    "ai": {
+      "optional": true
+    },
+    "ai-gateway-provider": {
+      "optional": true
+    },
+    "stripe": {
+      "optional": true
+    },
+    "drizzle-orm": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.84",
@@ -100,6 +114,7 @@
     "hono": "^4.6.0",
     "jose": "^6.2.3",
     "mysql2": "3.22.5",
+    "np": "^8.0.4",
     "prettier": "^3.8.4",
     "stripe": "^20.4.1",
     "typescript": "~5.6.2",

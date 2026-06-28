@@ -1,4 +1,4 @@
-// @rdlabo/hono-kit/testing — フリート共通のテスト基盤（mysql2/drizzle 依存）。
+// @rdlabo/workers-hono-kit/testing — フリート共通のテスト基盤（mysql2/drizzle 依存）。
 // 実行時には読み込まれないテスト専用ヘルパ。各 repo の testing/db.ts・fakes.ts を集約。
 
 export { createTestDb } from './db';

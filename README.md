@@ -1,4 +1,4 @@
-# @rdlabo/hono-kit
+# @rdlabo/workers-hono-kit
 
 Infrastructure toolkit for building APIs on [Hono](https://hono.dev) + [Cloudflare Workers](https://workers.cloudflare.com).
 
@@ -13,7 +13,7 @@ It provides the building blocks a NestJS-style API needs but that don't run on `
 ## Install
 
 ```bash
-npm install @rdlabo/hono-kit
+npm install @rdlabo/workers-hono-kit
 ```
 
 Peer dependencies — install the ones you use:
@@ -55,7 +55,7 @@ npm install hono zod @hono/zod-validator jose aws4fetch
 
 ```ts
 import { Hono } from 'hono';
-import { finalizeResponse } from '@rdlabo/hono-kit';
+import { finalizeResponse } from '@rdlabo/workers-hono-kit';
 
 const app = new Hono();
 app.use('*', finalizeResponse());
@@ -64,7 +64,7 @@ app.use('*', finalizeResponse());
 ### Request validation
 
 ```ts
-import { validate } from '@rdlabo/hono-kit';
+import { validate } from '@rdlabo/workers-hono-kit';
 import { z } from 'zod';
 
 app.post('/users', validate('json', z.object({ name: z.string() })), (c) => {
@@ -81,7 +81,7 @@ validate('json', schema, {
 `param` / `query` values arrive as strings — coerce numbers with the zod helpers:
 
 ```ts
-import { zNum, zNumOptional } from '@rdlabo/hono-kit';
+import { zNum, zNumOptional } from '@rdlabo/workers-hono-kit';
 
 const Params = z.object({ id: zNum(z.number().int()), page: zNumOptional() });
 ```
@@ -89,7 +89,7 @@ const Params = z.object({ id: zNum(z.number().int()), page: zNumOptional() });
 ### Firebase ID-token verification
 
 ```ts
-import { createRemoteFirebaseVerifier } from '@rdlabo/hono-kit';
+import { createRemoteFirebaseVerifier } from '@rdlabo/workers-hono-kit';
 
 const verifier = createRemoteFirebaseVerifier(projectId);
 const decoded = await verifier.verifyIdToken(idToken); // { uid, email, ... }
@@ -99,7 +99,7 @@ With `getUser` / `deleteUser` (needs a service account):
 
 ```ts
 import { createRemoteJWKSet } from 'jose';
-import { JoseFirebaseVerifier, IdentityToolkit, SECURETOKEN_JWK_URL } from '@rdlabo/hono-kit';
+import { JoseFirebaseVerifier, IdentityToolkit, SECURETOKEN_JWK_URL } from '@rdlabo/workers-hono-kit';
 
 const verifier = new JoseFirebaseVerifier({
   projectId,
@@ -111,7 +111,7 @@ const verifier = new JoseFirebaseVerifier({
 ### AWS Secrets Manager
 
 ```ts
-import { getAuthenticationSecret } from '@rdlabo/hono-kit';
+import { getAuthenticationSecret } from '@rdlabo/workers-hono-kit';
 
 interface MySecret {
   firebaseProduction: string;
@@ -131,7 +131,7 @@ const secret = await getAuthenticationSecret<MySecret>(
 ### Deadlock retry & HTTP helpers
 
 ```ts
-import { retryWhenDeadlock, getUserProtocol, getAppInfo, HttpStatus } from '@rdlabo/hono-kit';
+import { retryWhenDeadlock, getUserProtocol, getAppInfo, HttpStatus } from '@rdlabo/workers-hono-kit';
 
 await retryWhenDeadlock(() => db.transaction(/* ... */));
 
@@ -148,7 +148,7 @@ NestJS canonical shape (`{ statusCode, message, error? }`, `401` omits `error`);
 keeps its own byte-parity via options.
 
 ```ts
-import { createNestErrorHandler, nestNotFoundHandler } from '@rdlabo/hono-kit';
+import { createNestErrorHandler, nestNotFoundHandler } from '@rdlabo/workers-hono-kit';
 
 app.notFound(nestNotFoundHandler);
 app.onError(createNestErrorHandler());
@@ -173,7 +173,7 @@ verify/resolver, context-variable names, and failure mode.
 `setContext` is type-checked against your `Variables`.
 
 ```ts
-import { createAuthMiddleware } from '@rdlabo/hono-kit';
+import { createAuthMiddleware } from '@rdlabo/workers-hono-kit';
 
 // AuthGuard: verify + resolve (and provision) the DB user id.
 const userAuth = createAuthMiddleware<AppEnv, UserRecord, number>({
@@ -198,7 +198,7 @@ const tokenAuth = createAuthMiddleware<AppEnv, UserRecord>({
 ### KV cache
 
 ```ts
-import { KVCache } from '@rdlabo/hono-kit';
+import { KVCache } from '@rdlabo/workers-hono-kit';
 
 const cache = new KVCache(env.CACHE, { appName: 'myapp' }); // version defaults to 'v8_'
 await cache.set('users', 'byId', userId, user, 600);
@@ -208,7 +208,7 @@ const hit = await cache.get<User>('users', 'byId', userId);
 ### Stripe (Workers-native)
 
 ```ts
-import { createStripeClient, verifyStripeWebhook } from '@rdlabo/hono-kit';
+import { createStripeClient, verifyStripeWebhook } from '@rdlabo/workers-hono-kit';
 
 const stripe = createStripeClient(secret); // or { apiVersion: '2024-04-10' } to pin
 const event = await verifyStripeWebhook(secret, webhookSecret, rawBody, c.req.header('stripe-signature') ?? '');
@@ -216,7 +216,7 @@ const event = await verifyStripeWebhook(secret, webhookSecret, rawBody, c.req.he
 
 ## Local development / linking
 
-If you consume this package via a local path (e.g. `"@rdlabo/hono-kit": "../../hono-kit"`) rather than from npm, TypeScript and esbuild resolve the package's bare imports from *its own* `node_modules`, which can create a second `zod` instance. That breaks types where your zod-inferred values flow into other libraries (e.g. Drizzle inserts). Dedupe with tsconfig `paths`:
+If you consume this package via a local path (e.g. `"@rdlabo/workers-hono-kit": "../../hono-kit"`) rather than from npm, TypeScript and esbuild resolve the package's bare imports from *its own* `node_modules`, which can create a second `zod` instance. That breaks types where your zod-inferred values flow into other libraries (e.g. Drizzle inserts). Dedupe with tsconfig `paths`:
 
 ```jsonc
 {

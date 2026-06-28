@@ -5,7 +5,7 @@
 // 列生成は消費側の `customType` に委ね、kit は params とヘルパだけ供給する:
 //
 //   import { customType } from 'drizzle-orm/mysql-core';
-//   import { jstTimestampParams, jstDateParams } from '@rdlabo/hono-kit/db';
+//   import { jstTimestampParams, jstDateParams } from '@rdlabo/workers-hono-kit/db';
 //   export const jstTimestamp = (name: string, opts?: { fsp?: number }) =>
 //     customType<{ data: string | Date; driverData: string | Date }>(jstTimestampParams(opts?.fsp))(name);
 //   export const jstDate = (name: string) =>

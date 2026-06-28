@@ -11,7 +11,7 @@
 // All args after the script are forwarded to `wrangler` verbatim; the AWS --var flags
 // are appended. Wire it as the `dev` npm script (it spawns wrangler itself, so it
 // replaces both the old `predev` file-sync and the `wrangler dev` invocation):
-//   AWS_PROFILE=<profile> node node_modules/@rdlabo/hono-kit/scripts/sync-dev-aws.mjs dev --var APP_ENV:development
+//   AWS_PROFILE=<profile> node node_modules/@rdlabo/workers-hono-kit/scripts/sync-dev-aws.mjs dev --var APP_ENV:development
 //
 // Trade-off vs .dev.vars: creds appear in the wrangler process args (visible to other
 // users via `ps` on a shared host). Fine for a personal dev machine; nothing on disk.

@@ -20,7 +20,7 @@ export interface ErrorReportContext {
 /**
  * 想定外エラーの通報関数（Sentry 等）の型。各 repo の container.reportError がこの形。
  * `createNestErrorHandler({ onUnhandledError })` に `(err, c) => reporter(err, { requestId: c.get('requestId') })`
- * の形で差し込む。Sentry 呼び出し自体は各 repo（@sentry/cloudflare は hono-kit に持ち込まない）。
+ * の形で差し込む。Sentry 呼び出し自体は各 repo（@sentry/cloudflare は workers-hono-kit に持ち込まない）。
  */
 export type ErrorReporter = (error: unknown, context?: ErrorReportContext) => void;
 
@@ -66,8 +66,8 @@ export interface NestErrorHandlerOptions<E extends Env = Env> {
 }
 
 /**
- * hono の `HTTPException` を **構造的に**判定する（`instanceof` ではない）。hono-kit は consumer に
- * symlink 同梱されるため、hono-kit が解決する `hono` と consumer の `hono` が別インスタンスになり得る
+ * hono の `HTTPException` を **構造的に**判定する（`instanceof` ではない）。workers-hono-kit は consumer に
+ * symlink 同梱されるため、workers-hono-kit が解決する `hono` と consumer の `hono` が別インスタンスになり得る
  * （別コピーの HTTPException は `instanceof` で一致しない）。`getResponse()` と数値 `status` を持つかで
  * 判定すればモジュール境界をまたいでも、prod バンドルでも安定する。
  */
