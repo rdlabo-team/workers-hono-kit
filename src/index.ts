@@ -46,6 +46,12 @@ export type { CreateStripeClientOptions } from './stripe/client.js';
 // db
 export { retryWhenDeadlock } from './db/retry.js';
 
+// queue
+export { sendInChunks } from './queue/send.js';
+export type { QueueLike, QueueSendMessage } from './queue/send.js';
+export { processBatch } from './queue/consumer.js';
+export type { QueueMessageLike, MessageBatchLike, ProcessBatchOptions, ProcessBatchResult } from './queue/consumer.js';
+
 // ai
 export { createAiGatewayProvider } from './ai/gateway.js';
 export type {
