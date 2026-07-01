@@ -37,9 +37,10 @@ export interface QueueLike<Body = unknown> {
    *
    * @param messages - The message envelopes to enqueue; at most 100 per call, 256 KB per batch.
    * @param options - Optional batch-level options, e.g. a `delaySeconds` applied to every message.
-   * @returns A promise that resolves once the batch is accepted.
+   * @returns A promise that resolves once the batch is accepted. The resolved value is ignored, so a
+   *   real `Queue` binding (whose `sendBatch` resolves to a `QueueSendBatchResponse`) is assignable.
    */
-  sendBatch: (messages: Iterable<QueueSendMessage<Body>>, options?: { delaySeconds?: number }) => Promise<void>;
+  sendBatch: (messages: Iterable<QueueSendMessage<Body>>, options?: { delaySeconds?: number }) => Promise<unknown>;
 }
 
 /**
