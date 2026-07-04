@@ -52,6 +52,18 @@ export interface FirebaseVerifier {
    */
   getUser(uid: string): Promise<{ uid: string; email?: string } | null>;
   /**
+   * Look up multiple user records by uid in as few requests as the backing service allows.
+   *
+   * Batched equivalent of {@link getUser}, intended to replace N single-uid lookups with a
+   * handful of requests.
+   *
+   * @param uids - The users' unique ids to look up.
+   * @returns The `uid`/`email` of every matching user. Uids that do not resolve to a user are
+   *   simply absent from the result (never `null` entries).
+   * @throws If the backing user-management service is not configured or the lookup fails.
+   */
+  getUsers(uids: string[]): Promise<{ uid: string; email?: string }[]>;
+  /**
    * Delete a user by uid.
    *
    * Mirrors `firebase-admin` `getAuth().deleteUser()`.

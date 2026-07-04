@@ -57,6 +57,16 @@ export class FakeFirebaseVerifier implements FirebaseVerifier {
   }
 
   /**
+   * Return minimal user records echoing each requested UID.
+   *
+   * @param uids - UIDs to look up.
+   * @returns One `{ uid }` entry per requested uid (never omits any, in this fake).
+   */
+  async getUsers(uids: string[]): Promise<{ uid: string; email?: string }[]> {
+    return uids.map((uid) => ({ uid }));
+  }
+
+  /**
    * Record a user deletion by appending the UID to {@link FakeFirebaseVerifier.deleted}.
    *
    * @param uid - UID being deleted.

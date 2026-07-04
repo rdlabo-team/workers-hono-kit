@@ -21,6 +21,8 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const IDENTITY_TOOLKIT = 'https://identitytoolkit.googleapis.com/v1';
 /** OAuth2 scopes required for Identity Toolkit account lookup and deletion. */
 const SCOPE = 'https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/firebase';
+/** Maximum number of `localId`s the `accounts:lookup` endpoint accepts in a single request. */
+const LOOKUP_CHUNK_SIZE = 100;
 
 /**
  * Minimal Google Identity Toolkit REST client for the user-management operations that token
@@ -89,6 +91,30 @@ export class IdentityToolkit {
   }
 
   /**
+   * Call the `accounts:lookup` endpoint for a single chunk of `localId`s.
+   *
+   * @param localIds - Up to {@link LOOKUP_CHUNK_SIZE} `localId`s to look up in one request.
+   * @param nowSeconds - The current Unix time in seconds, used for access-token caching.
+   * @returns The raw `users` entries returned by the endpoint (empty when the request is
+   *   unsuccessful or no matching users are returned).
+   * @throws If acquiring an access token fails.
+   * @internal
+   */
+  private async lookupChunk(localIds: string[], nowSeconds: number): Promise<{ localId: string; email?: string }[]> {
+    const token = await this.getAccessToken(nowSeconds);
+    const res = await fetch(`${IDENTITY_TOOLKIT}/projects/${this.sa.project_id}/accounts:lookup`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ localId: localIds }),
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const json = (await res.json()) as { users?: { localId: string; email?: string }[] };
+    return json.users ?? [];
+  }
+
+  /**
    * Look up a user record by uid via the `accounts:lookup` endpoint.
    *
    * @param uid - The user's unique id (`localId`).
@@ -98,18 +124,37 @@ export class IdentityToolkit {
    * @throws If acquiring an access token fails.
    */
   async lookup(uid: string, nowSeconds: number): Promise<{ uid: string; email?: string } | null> {
-    const token = await this.getAccessToken(nowSeconds);
-    const res = await fetch(`${IDENTITY_TOOLKIT}/projects/${this.sa.project_id}/accounts:lookup`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ localId: [uid] }),
-    });
-    if (!res.ok) {
-      return null;
+    const users = await this.lookupChunk([uid], nowSeconds);
+    return users.length > 0 ? { uid: users[0].localId, email: users[0].email } : null;
+  }
+
+  /**
+   * Look up multiple user records by uid via the `accounts:lookup` endpoint.
+   *
+   * `uids` are chunked into groups of at most {@link LOOKUP_CHUNK_SIZE} (the maximum `localId`
+   * array size the endpoint accepts), issuing one `accounts:lookup` request per chunk. This lets
+   * callers replace N single-uid lookups with `ceil(N / LOOKUP_CHUNK_SIZE)` requests.
+   *
+   * @param uids - The users' unique ids (`localId`s) to look up.
+   * @param nowSeconds - The current Unix time in seconds, used for access-token caching.
+   * @returns The `uid`/`email` of every matching user. Uids Firebase does not recognize are
+   *   simply absent from the result (never `null` entries), so callers can treat "missing from
+   *   the result" as "not found/invalid".
+   * @throws If acquiring an access token fails.
+   */
+  async lookupMany(uids: string[], nowSeconds: number): Promise<{ uid: string; email?: string }[]> {
+    if (uids.length === 0) {
+      return [];
     }
-    const json = (await res.json()) as { users?: { localId: string; email?: string }[] };
-    const user = json.users?.[0];
-    return user ? { uid: user.localId, email: user.email } : null;
+    const results: { uid: string; email?: string }[] = [];
+    for (let i = 0; i < uids.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = uids.slice(i, i + LOOKUP_CHUNK_SIZE);
+      const users = await this.lookupChunk(chunk, nowSeconds);
+      for (const user of users) {
+        results.push({ uid: user.localId, email: user.email });
+      }
+    }
+    return results;
   }
 
   /**

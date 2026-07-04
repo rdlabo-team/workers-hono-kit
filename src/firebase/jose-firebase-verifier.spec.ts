@@ -102,4 +102,23 @@ describe('JoseFirebaseVerifier (verifyIdToken parity with firebase-admin)', () =
       expect(remove).toHaveBeenCalledWith('uid1', expect.any(Number));
     });
   });
+
+  describe('getUsers', () => {
+    it('throws when no Identity Toolkit is configured', async () => {
+      const { verifier } = await makeVerifier();
+      await expect(verifier.getUsers(['uid1', 'uid2'])).rejects.toThrow('Identity Toolkit not configured');
+    });
+
+    it('delegates to the Identity Toolkit lookupMany with the requested uids', async () => {
+      const lookupMany = vi.fn(async () => [{ uid: 'uid1', email: 'a@b.c' }, { uid: 'uid2' }]);
+      const identity = { lookupMany } as unknown as IdentityToolkit;
+      const { verifier } = await makeVerifier(identity);
+
+      await expect(verifier.getUsers(['uid1', 'uid2'])).resolves.toEqual([
+        { uid: 'uid1', email: 'a@b.c' },
+        { uid: 'uid2' },
+      ]);
+      expect(lookupMany).toHaveBeenCalledWith(['uid1', 'uid2'], expect.any(Number));
+    });
+  });
 });

@@ -116,6 +116,24 @@ export class JoseFirebaseVerifier implements FirebaseVerifier {
   }
 
   /**
+   * Look up multiple user records by uid via the Identity Toolkit REST API.
+   *
+   * Batches the lookups into `ceil(uids.length / 100)` `accounts:lookup` requests instead of
+   * one request per uid.
+   *
+   * @param uids - The users' unique ids to look up.
+   * @returns The `uid`/`email` of every matching user. Uids Firebase does not recognize are
+   *   simply absent from the result (never `null` entries).
+   * @throws If no Identity Toolkit client was configured on this verifier.
+   */
+  async getUsers(uids: string[]): Promise<{ uid: string; email?: string }[]> {
+    if (!this.opts.identity) {
+      throw new Error('Identity Toolkit not configured');
+    }
+    return this.opts.identity.lookupMany(uids, this.nowSeconds());
+  }
+
+  /**
    * Delete a user by uid via the Identity Toolkit REST API.
    *
    * @param uid - The user's unique id.
