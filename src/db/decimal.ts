@@ -1,12 +1,14 @@
 /**
- * MySQL `DECIMAL` 列向け Drizzle `customType` params。
+ * Drizzle `customType` params for a MySQL `DECIMAL` column.
  *
  * @remarks
- * - **読込（SELECT）**: `fromDriver` で driver 値（`number` / `string` / `null`）を JS `number | null` に統一。
- *   接続 `decimalNumbers: true`（{@link hyperdriveConnectionOptions} 既定）と併用し、Drizzle builder 経路でも
- *   文字列 `"0"` / `"100.00"` が混ざったときに 0 を潰さず number へ揃える。
- * - **書込（INSERT/UPDATE）**: `toDriver` で number をそのまま mysql2 に bind（`String()` 変換不要）。
- * - 生 SQL `db.read` は接続 `decimalNumbers: true` が効く。列型の `fromDriver` は Drizzle `select` 経路向け。
+ * - **Reads (SELECT)**: `fromDriver` unifies the driver value (`number` / `string` / `null`) to a JS
+ *   `number | null`. Combined with the connection's `decimalNumbers: true`
+ *   ({@link hyperdriveConnectionOptions} default), it aligns values to numbers even on the Drizzle
+ *   builder path when strings like `"0"` / `"100.00"` slip in, without dropping `0`.
+ * - **Writes (INSERT/UPDATE)**: `toDriver` binds the number to mysql2 as-is (no `String()` conversion).
+ * - Raw-SQL `db.read` relies on the connection's `decimalNumbers: true`; the column's `fromDriver` is
+ *   for the Drizzle `select` path.
  */
 
 export interface DecimalNumberConfig {
@@ -15,8 +17,11 @@ export interface DecimalNumberConfig {
 }
 
 /**
- * mysql2 / Drizzle から届いた DECIMAL 値を JS `number | null` へ正規化する。
- * `0` は falsy 落ちしないようそのまま保持する。
+ * Normalize a DECIMAL value coming from mysql2 / Drizzle to a JS `number | null`.
+ * `0` is preserved as-is so it is not dropped as falsy.
+ *
+ * @param value - the raw driver value (`number` / `string` / `bigint` / nullish).
+ * @returns the coerced finite number, or `null` when it cannot be resolved.
  */
 export function coerceDecimalNumber(value: unknown): number | null {
   if (value === null || value === undefined) {
@@ -40,7 +45,10 @@ export function coerceDecimalNumber(value: unknown): number | null {
 }
 
 /**
- * `customType` 用 params。高度な用途向け。通常は {@link decimalNumber} 列ヘルパーを使う。
+ * Params for a `customType`. For advanced use; the {@link decimalNumber} column helper is usually enough.
+ *
+ * @param config - the DECIMAL `precision` / `scale`.
+ * @returns the `customType` params (`dataType` / `fromDriver` / `toDriver`).
  */
 export const decimalNumberParams = (
   config: DecimalNumberConfig,

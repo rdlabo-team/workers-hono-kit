@@ -35,13 +35,13 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 > **Compiled ESM, with types.** The package is published as compiled ES modules (`./dist/*.js`) plus
 > declaration files (`./dist/*.d.ts`) via the `exports` field. It depends only on Web-standard APIs
 > (`fetch`, `crypto.subtle`, `Response`) available on Cloudflare Workers (`workerd`) and other edge
-> runtimes, and requires Node.js ≥ 20 for tooling. Three entry points are exposed:
+> runtimes, and requires Node.js ≥ 20 for tooling. Four entry points are exposed:
 >
 > | Subpath | Import | Use |
 > | --- | --- | --- |
 > | `.` | `@rdlabo/workers-hono-kit` | Web-standard helpers (middleware, HTTP, Firebase, AWS, AI, Stripe, KV). |
 > | `./db` | `@rdlabo/workers-hono-kit/db` | MySQL data layer (mysql2 + Drizzle). |
-> | `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST 業務時刻 API（`toBusinessDateTime` / `normalizeBusinessDate` 等）。 |
+> | `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST business-time API (`toBusinessDateTime` / `normalizeBusinessDate` / `formatBusinessDateTime`, etc.). |
 > | `./testing` | `@rdlabo/workers-hono-kit/testing` | Test helpers (mysql2 + Drizzle + fakes/fixtures). |
 
 ## API
@@ -88,45 +88,82 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | `createMysqlDatabase(options)` | Assemble a `Database` from an already-connected Drizzle ORM + replica `QueryRunner`. |
 | `databaseFrom(orm, replica)` | Build a `Database` from an existing Drizzle instance + replica handle. |
 | `Database` / `DisposableDatabase` / `QueryRunner` / `TxOf` | The `read` / `write` / `transaction` API and its supporting types. |
-| `hyperdriveConnectionOptions(hyperdrive, overrides?)` / `HyperdriveLike` / `ExecutionContextLike` | Build mysql2 `createConnection` options from a Hyperdrive binding (`disableEval`, `decimalNumbers`, `timezone '+09:00'` by default). |
+| `hyperdriveConnectionOptions(hyperdrive, overrides?)` / `HyperdriveLike` / `ExecutionContextLike` | Build mysql2 `createConnection` options from a Hyperdrive binding (`disableEval`, `decimalNumbers`, `timezone '+09:00'` by default). `ExecutionContextLike` is the same type as the root export, re-exported here so `withMysqlConnections` callers don't need the root import. |
 | `withMysqlConnections(...)` | Open primary/replica connections, run a function, close them in `finally` (via `ctx.waitUntil`). |
 | `retryWhenDeadlock(fn, retries?, delay?)` | Same deadlock-retry helper as the root export. |
 | `insertIdOf` / `affectedRowsOf` / `insertedIdsOf` / `DzWriteResult` | Extract `insertId` / `affectedRows` (and derive contiguous bulk-insert ids) from a mysql2 write result. |
-| `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization params（高度な用途）。 |
-| `jstTimestamp` / `jstDatetime` / `jstDate` / `decimalNumber` | Drizzle 列ヘルパー（repo 側ラッパー不要）。 |
-| `jstOnUpdateNow` | `ON UPDATE CURRENT_TIMESTAMP` 用 SQL 式。`jstTimestamp` 等の customType は `.onUpdateNow()` 非対応のため `.$onUpdateFn(() => jstOnUpdateNow(fsp))` と併用。 |
-| `coerceDecimalNumber` / `decimalNumberParams` | DECIMAL 正規化 params（通常は `decimalNumber` 列ヘルパーで十分）。 |
+| `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization params (advanced use). |
+| `jstTimestamp` / `jstDatetime` / `jstDate` / `decimalNumber` | Drizzle column helpers (no repo-side wrapper needed). |
+| `jstOnUpdateNow` | SQL expression for `ON UPDATE CURRENT_TIMESTAMP`. The `jstTimestamp` customType (and friends) do not support `.onUpdateNow()`, so pair it with `.$onUpdateFn(() => jstOnUpdateNow(fsp))`. |
+| `coerceDecimalNumber` / `decimalNumberParams` | DECIMAL normalization params (the `decimalNumber` column helper is usually enough). |
 | `DRIZZLE_ORM_OPTIONS` / `honoDrizzleConfig(options)` / `HonoDrizzleConfigOptions` | Shared Drizzle casing (`snake_case`) for both the runtime `drizzle()` call and `drizzle.config.ts`, keeping config ↔ runtime in sync. |
 | `resolveDbSecret(options, secretId?)` / `ResolvedDbSecret` | Resolve RDS-managed or plain DB credentials from AWS Secrets Manager for CI migrate / local tooling. |
 | `baselineMigrations(options)` / `readBaselineEntry(migrationsFolder)` / `BaselineMigrationsOptions` / `BaselineResult` / `BaselineEntry` | Brownfield first-deploy helper: mark an existing `0000_*` migration as applied without re-running DDL. |
 
-#### Drizzle 列ヘルパー（`jstTimestamp` / `decimalNumber` 等）
+#### Drizzle column helpers (`jstTimestamp` / `decimalNumber`, etc.)
 
-- `drizzle-orm` は **peer** のみ。kit は `drizzle-orm` を依存に含めない（publish 後も consumer の 1 本を使う）。
-- consumer は通常どおり `drizzle-orm` を `dependencies` に置くだけでよい。**`package.json` の `overrides` は不要**。
-- npm publish 物には `devDependencies` は含まれないため、インストール先で kit 専用の `drizzle-orm` は増えない（peer の 1 本のみ）。
-- 列ヘルパーは runtime で consumer の `drizzle-orm` を `import` し、型は `customType` 推論そのまま（`MySqlCustomColumnBuilder<…>`）。`any` は使わないので consumer テーブルの `$inferSelect` に列の意味型が伝播する。
-- **前提: drizzle を単一コピーに解決すること。** drizzle の `SQL` は private フィールド `shouldInlineParams` を持つ**名目型**で、kit と consumer が別コピーを解決すると `jstTimestamp(…).default(sql\`…\`)` が `TS2345 separate declarations of a private property 'shouldInlineParams'` で全 schema 落ちする。`file:` リンク開発では kit 配下に `drizzle-orm` がネストして二重コピーになるため、**consumer の `tsconfig.json` で `drizzle-orm` を自身の 1 コピーへ固定**する:
+- `drizzle-orm` is a **peer** only. The kit does not include `drizzle-orm` as a dependency (even after publishing, it uses the consumer's single copy).
+- The consumer just keeps `drizzle-orm` in its `dependencies` as usual. **No `overrides` in `package.json` are needed.**
+- The npm-published artifact contains no `devDependencies`, so installing it does not add a kit-specific `drizzle-orm` (there is only the one peer copy).
+- The column helpers `import` the consumer's `drizzle-orm` at runtime, and the types are the `customType` inference as-is (`MySqlCustomColumnBuilder<…>`). No `any` is used, so the column's semantic type propagates to the consumer table's `$inferSelect`.
+- **Precondition: resolve drizzle to a single copy.** Drizzle's `SQL` is a **nominal** type carrying a private field `shouldInlineParams`, so if the kit and the consumer resolve different copies, `jstTimestamp(…).default(sql\`…\`)` fails the whole schema with `TS2345 separate declarations of a private property 'shouldInlineParams'`. Under `file:`-link development, `drizzle-orm` nests under the kit and becomes a second copy, so **pin `drizzle-orm` to the consumer's own single copy in `tsconfig.json`**:
 
   ```jsonc
-  // tsconfig.json compilerOptions（既存 paths があればマージ）
+  // tsconfig.json compilerOptions (merge with existing paths if any)
   "paths": {
     "drizzle-orm": ["./node_modules/drizzle-orm"],
     "drizzle-orm/*": ["./node_modules/drizzle-orm/*"]
   }
   ```
 
-  `moduleResolution: "Bundler"` なら `baseUrl` 不要（`baseUrl` 設定済みなら先頭 `./` は外す）。published 版（単一コピー）ではこの `paths` は無害。**overrides は不要。**
-- `file:` で kit を直リンクする開発では、kit リポジトリ側で `npm install` して peer を満たす（consumer 側で overrides を足さない）。
+  With `moduleResolution: "Bundler"`, `baseUrl` is not required (if `baseUrl` is already set, drop the leading `./`). On the published package (a single copy) these `paths` are harmless. **No `overrides` needed.**
+- When developing against the kit via a direct `file:` link, run `npm install` in the kit repo itself to satisfy its peers (do not add `overrides` on the consumer side).
 
-**`CURRENT_TIMESTAMP` と接続 `timezone:'+09:00'` の違い**
+**`CURRENT_TIMESTAMP` vs the connection `timezone:'+09:00'`**
 
-| 経路 | 誰が時刻を決めるか | JST との関係 |
+| Path | Who decides the time | Relationship to JST |
 | --- | --- | --- |
-| アプリが `Date` を bind（INSERT/UPDATE） | mysql2 + 接続 `timezone:'+09:00'` | ワイヤ上は JST として扱われる（`datetime-wire` テスト） |
-| `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` | MySQL サーバ（セッション `time_zone`） | 接続オプションとは**別経路**。RDS の `time_zone` が `+09:00` なら JST、UTC なら UTC |
+| The app binds a `Date` (INSERT/UPDATE) | mysql2 + connection `timezone:'+09:00'` | Treated as JST on the wire (`datetime-wire` test) |
+| `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` | The MySQL server (session `time_zone`) | A **separate path** from the connection option. JST if the RDS `time_zone` is `+09:00`, UTC if UTC |
 
-`jstTimestamp` / `jstDatetime` は読書の pass-through と DATE 正規化のみ担当し、DB 既定値の時刻帯は変えない。`ON UPDATE` が必要な列は `.$onUpdateFn(() => jstOnUpdateNow(6))` で DDL 意図を維持する。
+`jstTimestamp` / `jstDatetime` only handle read/write pass-through and DATE normalization; they do not change the timezone of server-side defaults. For columns that need `ON UPDATE`, keep the DDL intent with `.$onUpdateFn(() => jstOnUpdateNow(6))`.
+
+### Business time — `@rdlabo/workers-hono-kit/business-time`
+
+String-level JST business-time conversions (Workers UTC instant ↔ business calendar date / date-time),
+with **no `mysql2` / `drizzle-orm` dependency**. This is a different layer from the `./db` column helpers
+(which handle the MySQL wire format): the DB stays on JST, and the app handles JST explicitly through
+this module instead of relying implicitly on the connection `timezone`.
+
+| Export | Description |
+| --- | --- |
+| `today(ref?)` | The JST business calendar date (`YYYY-MM-DD`) of `ref` (defaults to now). |
+| `toBusinessDate(instant)` | UTC instant → JST business calendar date (`YYYY-MM-DD`). |
+| `normalizeBusinessDate(value)` | Normalize a `string` / `Date` / nullish to `YYYY-MM-DD`; a `YYYY-MM-DD` string passes through unchanged, nullish/empty/invalid → `null`. |
+| `toBusinessDateTime(instant)` | UTC instant → JST business date-time (`YYYY-MM-DD HH:mm:ss`). |
+| `parseBusinessDateTime(value)` | JST business date-time string → UTC instant (accepts a space or `T` separator). |
+| `formatBusinessDateTime(instant, pattern?)` | Format an instant in the business TZ (Nest `helper.formatDate`-compatible tokens). |
+| `startOfBusinessDay(date)` / `endOfBusinessDay(date)` | UTC instant of `00:00:00` / `23:59:59` on a JST business date. |
+| `businessDateTimeInstant(date, time)` | JST business date + wall-clock time → UTC instant. |
+| `addBusinessDays(date, days)` | Add calendar days to a JST business date. |
+| `ageOnBusinessDate(birthDate, asOfDate?)` | Full years of age on a business date (`asOfDate` defaults to `today()`). |
+| `DEFAULT_BUSINESS_DATETIME_PATTERN` | Default `formatBusinessDateTime` pattern (`YYYY-MM-DDThh:mm:ss`). |
+| `BUSINESS_TIMEZONE` / `BusinessDate` / `BusinessDateTime` | JST timezone constant and the business-date / date-time string types. |
+
+```ts
+import {
+  toBusinessDate,
+  toBusinessDateTime,
+  formatBusinessDateTime,
+  addBusinessDays,
+} from '@rdlabo/workers-hono-kit/business-time';
+
+const now = new Date('2026-07-05T21:00:00Z');
+toBusinessDate(now); // '2026-07-06' (JST)
+toBusinessDateTime(now); // '2026-07-06 06:00:00'
+formatBusinessDateTime(now); // '2026-07-06T06:00:00'
+addBusinessDays('2026-07-06', 3); // '2026-07-09'
+```
 
 ### Testing — `@rdlabo/workers-hono-kit/testing`
 
@@ -386,6 +423,16 @@ If you consume this package via a local path (e.g. `"@rdlabo/workers-hono-kit": 
 ```
 
 When installed from npm normally, package managers dedupe `zod` to a single copy and this is not needed.
+
+## CLI
+
+The package ships three `bin` commands (run via `npx` or an npm script in the consuming app):
+
+| Command | Use |
+| --- | --- |
+| `workers-hono-kit-sync-dev-aws <wrangler-args…>` | Launch `wrangler` with AWS credentials injected as `--var`, resolved from the active AWS profile (honors `AWS_PROFILE`, supports short-lived SSO/temporary creds). Nothing is written to disk — replaces `.dev.vars`. Wire it as the `dev` script, e.g. `AWS_PROFILE=<p> workers-hono-kit-sync-dev-aws dev --var APP_ENV:development`. |
+| `workers-hono-kit-check-subrequest-fanout [dir…]` | CI gate that greps for per-item external-call fan-outs (`runWithConcurrency(` / `PromisePool` / `.withConcurrency(`) that would eventually exceed the Workers subrequest cap. Annotate a genuinely-safe site with `subrequest-ok`. Scans `src` by default; exits 1 on an un-annotated marker. |
+| `workers-hono-kit-db-baseline [--migrations ./drizzle]` | Brownfield first-deploy helper: record the baseline `0000` migration as *already applied* on an existing MySQL DB without running its DDL (the CLI wrapper around `baselineMigrations` / `readBaselineEntry`). Reads DB credentials from `DB_SECRET` (AWS RDS managed secret) or the individual `DB_*` env vars. |
 
 ## Development
 

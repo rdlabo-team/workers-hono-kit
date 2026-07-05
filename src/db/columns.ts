@@ -1,21 +1,25 @@
 /**
- * Drizzle 列ヘルパー（フリート共通）。各 repo の `custom-types.ts` / `columns.ts` 薄いラッパーは不要。
+ * Shared Drizzle column helpers. Removes the need for a thin `custom-types.ts` / `columns.ts` wrapper
+ * in each repo.
  *
  * @remarks
- * `drizzle-orm` は **peer**（consumer が 1 本解決）。kit は `drizzle-orm` を bundled しない。
- * 戻り型は `customType` 推論そのまま（`MySqlCustomColumnBuilder<…>`）で `any` を使わない。
- * これにより consumer テーブルの `$inferSelect` に列の意味型（`string | Date` / `number | null` など）が伝播する。
+ * `drizzle-orm` is a **peer** (the consumer resolves a single copy); the kit does not bundle it. The
+ * return types are the `customType` inference as-is (`MySqlCustomColumnBuilder<…>`) with no `any`, so
+ * the column's semantic type (`string | Date`, `number | null`, etc.) propagates to the consumer
+ * table's `$inferSelect`.
  *
- * **前提（単一 drizzle コピー）**: drizzle の `SQL` は private フィールド `shouldInlineParams` を持つ
- * **名目型**なので、kit と consumer が drizzle の別コピーを解決すると
- * `jstTimestamp(…).default(sql\`…\`)` が `TS2345: separate declarations of a private property
- * 'shouldInlineParams'` で落ちる。フリートは kit を `file:` リンク参照するため kit 配下に drizzle が
- * ネストし二重コピーになりやすい。consumer 側 tsconfig の `paths` で `drizzle-orm` を **自身の 1 コピーへ
- * 固定**して単一化すること（README「Drizzle 列ヘルパー」参照）。published 版（単一コピー）ではそのまま単一。
+ * **Precondition (a single drizzle copy)**: Drizzle's `SQL` is a **nominal** type carrying a private
+ * field `shouldInlineParams`, so if the kit and the consumer resolve different copies of drizzle,
+ * `jstTimestamp(…).default(sql\`…\`)` fails with `TS2345: separate declarations of a private property
+ * 'shouldInlineParams'`. The fleet references the kit via a `file:` link, which tends to nest a second
+ * copy of drizzle under the kit. Pin `drizzle-orm` to the consumer's **own single copy** with tsconfig
+ * `paths` (see the "Drizzle column helpers" section of the README). The published package (a single
+ * copy) is already unified.
  *
- * **DEFAULT / ON UPDATE CURRENT_TIMESTAMP** … MySQL サーバ側の既定値（列を省略した INSERT / UPDATE）。
- * 接続 `timezone:'+09:00'`（{@link hyperdriveConnectionOptions}）が効くのは **アプリから Date を bind するとき**。
- * 両者を混同しないこと（`datetime-wire` / `drizzle-smoke` の JST テスト参照）。
+ * **DEFAULT / ON UPDATE CURRENT_TIMESTAMP** is a server-side default (an INSERT / UPDATE that omits the
+ * column). The connection's `timezone:'+09:00'` ({@link hyperdriveConnectionOptions}) only applies when
+ * the **app binds a `Date`**. Do not conflate the two (see the `datetime-wire` / `drizzle-smoke` JST
+ * tests).
  */
 import { sql } from 'drizzle-orm';
 import { customType } from 'drizzle-orm/mysql-core';
@@ -24,24 +28,26 @@ import type { DecimalNumberConfig } from './decimal.js';
 import { jstDateParams, jstDatetimeParams, jstTimestampParams } from './jst.js';
 
 /**
- * `ON UPDATE CURRENT_TIMESTAMP` 用式（MySQL セッション時刻）。
- * customType 列は `.onUpdateNow()` が無いため `.$onUpdateFn(() => jstOnUpdateNow(fsp))` と併用する。
+ * SQL expression for `ON UPDATE CURRENT_TIMESTAMP` (the MySQL session clock).
+ * customType columns have no `.onUpdateNow()`, so pair this with `.$onUpdateFn(() => jstOnUpdateNow(fsp))`.
+ *
+ * @param fsp - optional fractional-seconds precision; when provided, emits `CURRENT_TIMESTAMP(fsp)`.
  */
 export const jstOnUpdateNow = (fsp?: number) =>
   fsp != null ? sql`(CURRENT_TIMESTAMP(${sql.raw(String(fsp))}))` : sql`(CURRENT_TIMESTAMP)`;
 
-/** MySQL `timestamp` — pass-through。Date は接続 `timezone:'+09:00'` で mysql2 が JST 整形。 */
+/** MySQL `timestamp` — pass-through. A `Date` is formatted as JST by mysql2 via the connection `timezone:'+09:00'`. */
 export const jstTimestamp = (name: string, opts?: { fsp?: number }) =>
   customType<{ data: string | Date; driverData: string | Date }>(jstTimestampParams(opts?.fsp))(name);
 
-/** MySQL `datetime` — {@link jstTimestamp} と同じ pass-through 方針。 */
+/** MySQL `datetime` — same pass-through policy as {@link jstTimestamp}. */
 export const jstDatetime = (name: string, opts?: { fsp?: number }) =>
   customType<{ data: string | Date; driverData: string | Date }>(jstDatetimeParams(opts?.fsp))(name);
 
-/** MySQL `date` — INSERT/UPDATE 時に ISO / 空文字を `YYYY-MM-DD` へ正規化（`toDriver`）。 */
+/** MySQL `date` — on INSERT/UPDATE, normalizes ISO / empty strings to `YYYY-MM-DD` (via `toDriver`). */
 export const jstDate = (name: string) =>
   customType<{ data: string | null; driverData: string | null }>(jstDateParams())(name);
 
-/** MySQL `decimal` — SELECT は `fromDriver` で string→number、書込は number をそのまま bind。 */
+/** MySQL `decimal` — SELECT coerces string→number via `fromDriver`; writes bind the number as-is. */
 export const decimalNumber = (name: string, config: DecimalNumberConfig) =>
   customType<{ data: number | null; driverData: number | string | null }>(decimalNumberParams(config))(name);

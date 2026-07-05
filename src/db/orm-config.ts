@@ -95,12 +95,12 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
     tablesFilter,
     introspect,
   } = options;
-  // CI/本番の migrate は AWS Secrets Manager の RDS マネージド secret（キー
-  // host/port/dbname/username/password）を `DB_SECRET` にまるごと渡す運用を吸収する。JSON.parse で
-  // 解釈するので secret のキー名（host≠DB_HOST）差を map でき、password の特殊文字もシェル安全。
-  // 未設定（ローカル/db:generate）は従来どおり個別 env → デフォルトにフォールバック。
-  // DB_SECRET が在れば「完全な secret」として全接続情報をそれで確定する（欠損/不正は throw）。
-  // 未設定時のみ従来の個別 env → デフォルトにフォールバックする。
+  // CI/production migrate absorbs the pattern of passing a whole AWS Secrets Manager RDS managed secret
+  // (keys host/port/dbname/username/password) via `DB_SECRET`. It is parsed with JSON.parse, so key-name
+  // differences (host ≠ DB_HOST) can be mapped and special characters in the password stay shell-safe.
+  // When `DB_SECRET` is set, it is treated as a complete secret and fully determines the connection
+  // (missing/invalid → throw). Only when it is unset do we fall back to the individual DB_* env vars
+  // and then the defaults (the local / db:generate path).
   const secret = resolveDbSecret();
   const dbCredentials = secret
     ? {
@@ -128,7 +128,7 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
   };
 }
 
-/** {@link resolveDbSecret} の戻り値（正規化済みの接続情報）。 */
+/** The return value of {@link resolveDbSecret} (normalized connection info). */
 export interface ResolvedDbSecret {
   host: string;
   port: number;
@@ -138,14 +138,18 @@ export interface ResolvedDbSecret {
 }
 
 /**
- * AWS RDS マネージド secret（`DB_SECRET` に入れた JSON 文字列）を解決する。
+ * Resolve an AWS RDS managed secret (a JSON string placed in `DB_SECRET`).
  *
  * @remarks
- * - `DB_SECRET` 未設定 → `undefined`（ローカル/`db:generate` の正常フォールバック）。
- * - 設定されている場合は「完全な接続情報」であることを要求し、**不正 JSON / 必須キー欠損は throw**
- *   （静かに localhost へフォールバックして事故らせない）。`port` のみ欠損時は 3306 を補う。
+ * - `DB_SECRET` unset → `undefined` (the normal local / `db:generate` fallback).
+ * - When set, it must be complete connection info: **invalid JSON / a missing required key throws**
+ *   (rather than silently falling back to localhost and causing an incident). A missing `port` alone
+ *   defaults to 3306.
  *
- * `honoDrizzleConfig`（db:migrate）と `workers-hono-kit-db-baseline` bin の双方が同じ解釈を使う。
+ * Both `honoDrizzleConfig` (db:migrate) and the `workers-hono-kit-db-baseline` bin use this same logic.
+ *
+ * @returns the resolved connection info, or `undefined` when `DB_SECRET` is unset.
+ * @throws Error when `DB_SECRET` is set but is not valid JSON or is missing a required key.
  */
 export function resolveDbSecret(): ResolvedDbSecret | undefined {
   const raw = process.env.DB_SECRET;

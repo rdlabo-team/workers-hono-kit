@@ -1,18 +1,21 @@
 /**
  * Brownfield baseline for Drizzle MySQL migrations.
  *
- * 既存（現行サービス）の DB は先にスキーマが存在するため、コミット済みの baseline マイグレーション
- * （`drizzle/0000_*.sql` = 現行スキーマを introspect した CREATE TABLE 群）を `db:migrate` で流すと
- * 全テーブルが衝突して失敗する。そこで 0000 を **実行せず「適用済み」として記録**する。
+ * An existing (in-production) DB already has its schema, so running the committed baseline migration
+ * (`drizzle/0000_*.sql` = the CREATE TABLE statements introspected from the current schema) via
+ * `db:migrate` fails as every table collides. Instead, 0000 is **recorded as "applied" without being
+ * executed**.
  *
- * 適用判定の根拠（drizzle-orm/mysql-core dialect.migrate）: `__drizzle_migrations(id, hash,
- * created_at)` の **`created_at` 最大値のみ**で未適用判定し、`max(created_at) < entry.when` の
- * migration だけ実行する。hash は保存されるが判定には使われない。よって 0000 の marker として
- * `(hash, created_at=当該 when)` を 1 行入れれば、以後 `db:migrate` は when がより大きい 0001+ だけを
- * 適用し、0000 は skip する。新規/テスト DB は marker が無いのでフルチェーンが走る（挙動不変）。
+ * How "applied" is decided (drizzle-orm/mysql-core dialect.migrate): it determines the pending set from
+ * **only the maximum `created_at`** in `__drizzle_migrations(id, hash, created_at)`, running just the
+ * migrations where `max(created_at) < entry.when`. The hash is stored but not used for the decision. So
+ * inserting one row as the 0000 marker — `(hash, created_at = that entry's when)` — makes subsequent
+ * `db:migrate` runs apply only the later 0001+ (larger `when`) and skip 0000. A fresh / test DB has no
+ * marker, so the full chain runs (behavior unchanged).
  *
- * この関数は `drizzle-orm` に依存しない（journal/SQL を自前で読み、hash は drizzle と同じ sha256）。
- * QueryRunner（mysql2 の `Connection`/`Pool` が構造的に代入可能）に対して生 SQL を実行する。
+ * This function does not depend on `drizzle-orm` (it reads the journal/SQL itself and hashes with the
+ * same sha256 as drizzle). It runs raw SQL against a QueryRunner (a mysql2 `Connection`/`Pool` is
+ * structurally assignable).
  *
  * @packageDocumentation
  */
@@ -22,32 +25,32 @@ import { join } from 'node:path';
 
 import type { QueryRunner } from './database.js';
 
-/** drizzle が使う既定のマイグレーション管理テーブル名。 */
+/** The default migration-tracking table name used by drizzle. */
 const MIGRATIONS_TABLE = '__drizzle_migrations';
 
-/** `meta/_journal.json` の 1 エントリ（必要なフィールドのみ）。 */
+/** A single `meta/_journal.json` entry (only the fields we need). */
 interface JournalEntry {
   idx: number;
   when: number;
   tag: string;
 }
 
-/** baseline（=最初の）マイグレーションの識別情報。 */
+/** Identifying info for the baseline (i.e. first) migration. */
 export interface BaselineEntry {
-  /** マイグレーション tag（例 `0000_melted_weapon_omega`）。 */
+  /** The migration tag (e.g. `0000_melted_weapon_omega`). */
   tag: string;
-  /** `_journal.json` の `when`（= drizzle の `created_at`／`folderMillis`）。 */
+  /** The `when` from `_journal.json` (= drizzle's `created_at` / `folderMillis`). */
   when: number;
-  /** `<tag>.sql` の生内容の sha256（drizzle と同一アルゴリズム）。 */
+  /** The sha256 of the raw `<tag>.sql` contents (the same algorithm as drizzle). */
   hash: string;
 }
 
 /**
- * `migrationsFolder`（drizzle の `out`、例 `./drizzle`）から baseline（最初の）エントリを読む。
+ * Read the baseline (first) entry from `migrationsFolder` (drizzle's `out`, e.g. `./drizzle`).
  *
- * @param migrationsFolder - `meta/_journal.json` と `<tag>.sql` を含むフォルダ。
- * @returns baseline エントリ（tag/when/hash）。
- * @throws journal が無い / エントリが空 / `<tag>.sql` が無い場合。
+ * @param migrationsFolder - the folder containing `meta/_journal.json` and `<tag>.sql`.
+ * @returns the baseline entry (tag/when/hash).
+ * @throws Error when the journal is missing, the entries are empty, or `<tag>.sql` is missing.
  */
 export function readBaselineEntry(migrationsFolder: string): BaselineEntry {
   const journalPath = join(migrationsFolder, 'meta', '_journal.json');
@@ -59,7 +62,8 @@ export function readBaselineEntry(migrationsFolder: string): BaselineEntry {
   if (entries.length === 0) {
     throw new Error(`No migration entries in ${journalPath}.`);
   }
-  // 起点は必ず最初のエントリ（0000）。以降 0001+ は「新しい変更」なので既存 DB でも実行されるべき。
+  // The origin is always the first entry (0000). Later 0001+ are "new changes" that should run even on
+  // an existing DB.
   const first = entries[0];
   const sqlPath = join(migrationsFolder, `${first.tag}.sql`);
   if (!existsSync(sqlPath)) {
@@ -69,15 +73,15 @@ export function readBaselineEntry(migrationsFolder: string): BaselineEntry {
   return { tag: first.tag, when: first.when, hash: createHash('sha256').update(sql).digest('hex') };
 }
 
-/** {@link baselineMigrations} のオプション。 */
+/** Options for {@link baselineMigrations}. */
 export interface BaselineMigrationsOptions {
-  /** 生 SQL を実行する QueryRunner（mysql2 `Connection`/`Pool` が代入可能）。対象 DB に接続済みのこと。 */
+  /** A QueryRunner for raw SQL (a mysql2 `Connection`/`Pool` is assignable). Must already be connected to the target DB. */
   db: QueryRunner;
-  /** drizzle の `out` フォルダ（既定 `./drizzle`）。 */
+  /** Drizzle's `out` folder (defaults to `./drizzle`). */
   migrationsFolder?: string;
 }
 
-/** {@link baselineMigrations} の結果。 */
+/** The result of {@link baselineMigrations}. */
 export type BaselineResult =
   | { status: 'inserted'; tag: string; when: number; hash: string }
   | { status: 'already-baselined'; tag: string; when: number };
@@ -88,24 +92,24 @@ async function rowsOf(db: QueryRunner, sql: string, params?: unknown[]): Promise
 }
 
 /**
- * 既存 DB へ baseline（0000）を「適用済み」として記録する。冪等・安全ガード付き。
+ * Record the baseline (0000) as "applied" on an existing DB. Idempotent, with safety guards.
  *
  * @remarks
- * ガード:
- * - 既に baseline marker（`created_at = when`）が在れば **no-op**（`already-baselined`）。
- * - marker は無いが `__drizzle_migrations` に別の行が在る → **中断**（想定外の状態）。
- * - 対象 DB に base table が 1 つも無い（空 DB）→ **中断**（空 DB は 0000 を skip すると
- *   テーブルが作られない。新規 DB には `db:migrate` を使う）。
+ * Guards:
+ * - If a baseline marker (`created_at = when`) already exists → **no-op** (`already-baselined`).
+ * - If there is no marker but `__drizzle_migrations` has other rows → **abort** (unexpected state).
+ * - If the target DB has no base tables (an empty DB) → **abort** (skipping 0000 on an empty DB would
+ *   never create the tables; use `db:migrate` for a fresh DB).
  *
- * @param options - 接続と migrations フォルダ。{@link BaselineMigrationsOptions} 参照。
- * @returns 挿入したか既に baseline 済みか。
- * @throws 上記ガードに該当する場合。
+ * @param options - the connection and migrations folder; see {@link BaselineMigrationsOptions}.
+ * @returns whether a marker was inserted or the DB was already baselined.
+ * @throws Error when one of the guards above trips.
  */
 export async function baselineMigrations(options: BaselineMigrationsOptions): Promise<BaselineResult> {
   const { db, migrationsFolder = './drizzle' } = options;
   const baseline = readBaselineEntry(migrationsFolder);
 
-  // migrator と同一 DDL（存在すれば no-op）。
+  // Same DDL as the migrator (a no-op if it already exists).
   await db.query(
     `create table if not exists \`${MIGRATIONS_TABLE}\` (
       id serial primary key,
@@ -114,7 +118,7 @@ export async function baselineMigrations(options: BaselineMigrationsOptions): Pr
     )`,
   );
 
-  // 既に baseline marker があれば冪等 no-op。
+  // If a baseline marker already exists, this is an idempotent no-op.
   const existing = await rowsOf(db, `select id from \`${MIGRATIONS_TABLE}\` where created_at = ? limit 1`, [
     baseline.when,
   ]);
@@ -122,7 +126,7 @@ export async function baselineMigrations(options: BaselineMigrationsOptions): Pr
     return { status: 'already-baselined', tag: baseline.tag, when: baseline.when };
   }
 
-  // marker は無いが行が在る＝既に別の状態。誤爆防止で中断。
+  // No marker but rows exist = already in some other state. Abort to avoid misfiring.
   const countRows = await rowsOf(db, `select count(*) as n from \`${MIGRATIONS_TABLE}\``);
   const rowCount = Number(countRows[0]?.n ?? 0);
   if (rowCount > 0) {
@@ -132,7 +136,8 @@ export async function baselineMigrations(options: BaselineMigrationsOptions): Pr
     );
   }
 
-  // 空 DB への baseline は危険（0000 を skip 扱いにするとテーブルが作られない）。brownfield 確認。
+  // Baselining an empty DB is dangerous (treating 0000 as skipped would never create the tables).
+  // Confirm this is a brownfield DB.
   const tableRows = await rowsOf(
     db,
     `select count(*) as n from information_schema.tables

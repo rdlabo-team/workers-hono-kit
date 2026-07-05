@@ -1,10 +1,10 @@
-/** JST 業務暦日 `YYYY-MM-DD`（instant ではない）。 */
+/** A JST business calendar date `YYYY-MM-DD` (a calendar day, not an instant). */
 export type BusinessDate = string;
 
-/** JST 業務日時 `YYYY-MM-DD HH:mm:ss`（MySQL DATETIME 互換の壁時計表現）。 */
+/** A JST business date-time `YYYY-MM-DD HH:mm:ss` (a wall-clock value, MySQL `DATETIME`-compatible). */
 export type BusinessDateTime = string;
 
-/** JST 業務タイムゾーン定数（Workers は UTC instant、業務はここで明示）。 */
+/** JST business timezone constant. Workers run in UTC instants; business time is made explicit here. */
 export const BUSINESS_TIMEZONE = {
   iana: 'Asia/Tokyo',
   offsetMinutes: 540,

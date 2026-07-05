@@ -2,14 +2,15 @@
 // Record the Drizzle baseline (0000) as *already applied* on an existing (brownfield) MySQL DB,
 // without executing its CREATE TABLE statements. One-time per environment.
 //
-// なぜ: 現行サービスの DB は先にスキーマが在るため、introspect 由来の baseline 0000 を `db:migrate`
-// で流すと衝突する。代わりに `__drizzle_migrations` に marker を 1 行入れ、以後 `db:migrate` が when の
-// 大きい 0001+ だけを適用するようにする（新規/テスト DB は marker 無しでフルチェーン＝挙動不変）。
+// Why: an in-production DB already has its schema, so running the introspect-derived baseline 0000 via
+// `db:migrate` collides. Instead we insert a single marker row into `__drizzle_migrations` so that
+// subsequent `db:migrate` runs apply only the later 0001+ (larger `when`). A fresh / test DB has no
+// marker, so the full chain runs (behavior unchanged).
 //
-// 実行基盤: VPC 内（AWS CodeBuild 等）から RDS へ直 TCP。Hyperdrive は Workers 専用で使えない。
-// creds は env（CodeBuild では Secrets Manager → env に注入）:
+// Where it runs: direct TCP from inside a VPC (e.g. AWS CodeBuild) to RDS. Hyperdrive is Workers-only
+// and cannot be used here. Credentials come from env (on CodeBuild, Secrets Manager → injected into env):
 //   DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
-// migrations フォルダ: 既定 ./drizzle（--migrations <dir> または MIGRATIONS_DIR で上書き）。
+// Migrations folder: defaults to ./drizzle (override with --migrations <dir> or MIGRATIONS_DIR).
 //
 // usage:
 //   npx workers-hono-kit-db-baseline [--migrations ./drizzle]
@@ -23,9 +24,9 @@ function arg(name) {
 }
 
 const migrationsFolder = arg('migrations') ?? process.env.MIGRATIONS_DIR ?? './drizzle';
-// db:migrate（honoDrizzleConfig）と同じ DB_SECRET 解釈を共有する。CI/本番は AWS Secrets Manager の
-// RDS マネージド secret を DB_SECRET に渡す運用（不正/欠損は resolveDbSecret が throw）。未設定時は
-// 従来の個別 DB_* env にフォールバック。
+// Shares the same DB_SECRET handling as db:migrate (honoDrizzleConfig). CI/production passes an AWS
+// Secrets Manager RDS managed secret via DB_SECRET (invalid/missing → resolveDbSecret throws). When
+// unset, it falls back to the individual DB_* env vars.
 const secret = resolveDbSecret();
 const conn = secret
   ? {

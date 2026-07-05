@@ -1,10 +1,11 @@
 /**
- * JST 業務時刻の明示 API（Workers UTC instant ↔ 業務暦日/日時）。
+ * Explicit JST business-time API (Workers UTC instant ↔ business calendar date / date-time).
  *
  * @remarks
- * - DB は JST 運用のまま。アプリは mysql2 `timezone` に暗黙依存せず、ここ経由で JST を扱う。
- * - MySQL ワイヤ形式への変換は {@link ../db/jst.js | db/jst} の責務。
- * - `Date` の local getter（`getHours` 等）は業務判定に使わない。
+ * - The DB stays on JST. The app does not implicitly rely on the mysql2 `timezone` option; it goes
+ *   through this module to handle JST.
+ * - Converting to the MySQL wire format is the responsibility of {@link ../db/jst.js | db/jst}.
+ * - Do not use a `Date`'s local getters (`getHours`, etc.) for business-time decisions.
  *
  * @packageDocumentation
  */
@@ -16,7 +17,7 @@ export { BUSINESS_TIMEZONE, type BusinessDate, type BusinessDateTime };
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
-/** instant を業務 TZ 壁時計として読むためのシフト（`getUTC*` で成分を得る）。 */
+/** Shift an instant so it can be read as a business-TZ wall clock (extract fields with `getUTC*`). */
 function toWallClock(instant: Date): Date {
   return new Date(instant.getTime() + BUSINESS_TIMEZONE.offsetMinutes * 60_000);
 }
@@ -37,23 +38,43 @@ function parseHms(time: string): [number, number, number] {
   return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
 }
 
-/** 参照 instant の JST 業務暦日。 */
+/**
+ * The JST business calendar date of a reference instant.
+ *
+ * @param ref - the instant to read; defaults to now.
+ * @returns the business date as `YYYY-MM-DD`.
+ * @example
+ * today(new Date('2026-07-05T20:00:00Z')); // → '2026-07-06' (JST)
+ */
 export function today(ref: Date = new Date()): BusinessDate {
   return toBusinessDate(ref);
 }
 
-/** UTC instant → JST 業務暦日。 */
+/**
+ * Convert a UTC instant to a JST business calendar date.
+ *
+ * @param instant - the UTC instant to convert.
+ * @returns the business date as `YYYY-MM-DD`.
+ */
 export function toBusinessDate(instant: Date): BusinessDate {
   const wall = toWallClock(instant);
   return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())}`;
 }
 
 /**
- * クライアント / DB 入力を JST 業務暦日 `YYYY-MM-DD` へ正規化する。
+ * Normalize a client / DB input to a JST business calendar date `YYYY-MM-DD`.
  *
- * - 既に `YYYY-MM-DD` の文字列は **Date 化せず**そのまま返す（誕生日は instant ではない）。
- * - ISO 8601 等は instant 経由で JST 暦日へ変換。
- * - nullish / 空 / 不正は `null`。
+ * - A string already in `YYYY-MM-DD` form is returned as-is, **without** constructing a `Date`
+ *   (a birthday is a calendar day, not an instant).
+ * - ISO 8601 and similar values are converted to a JST calendar date via their instant.
+ * - Nullish / empty / invalid inputs yield `null`.
+ *
+ * @param value - the string, `Date`, or nullish value to normalize.
+ * @returns the business date as `YYYY-MM-DD`, or `null` when the input cannot be resolved.
+ * @example
+ * normalizeBusinessDate('1990-01-15');            // → '1990-01-15' (unchanged)
+ * normalizeBusinessDate('2026-07-05T20:00:00Z');  // → '2026-07-06' (JST)
+ * normalizeBusinessDate('');                       // → null
  */
 export function normalizeBusinessDate(value: string | Date | null | undefined): BusinessDate | null {
   if (value == null) {
@@ -83,18 +104,33 @@ export function normalizeBusinessDate(value: string | Date | null | undefined): 
   return toBusinessDate(new Date(ms));
 }
 
-/** UTC instant → JST 業務日時（`YYYY-MM-DD HH:mm:ss`）。 */
+/**
+ * Convert a UTC instant to a JST business date-time (`YYYY-MM-DD HH:mm:ss`).
+ *
+ * @param instant - the UTC instant to convert.
+ * @returns the business date-time string.
+ * @example
+ * toBusinessDateTime(new Date('2026-07-05T21:00:00Z')); // → '2026-07-06 06:00:00' (JST)
+ */
 export function toBusinessDateTime(instant: Date): BusinessDateTime {
   const wall = toWallClock(instant);
   return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())} ${pad2(wall.getUTCHours())}:${pad2(wall.getUTCMinutes())}:${pad2(wall.getUTCSeconds())}`;
 }
 
-/** Nest / foodlabel / winecode `helper.formatDate` 既定パターン。 */
+/** Default pattern for the Nest / foodlabel / winecode `helper.formatDate`. */
 export const DEFAULT_BUSINESS_DATETIME_PATTERN = 'YYYY-MM-DDThh:mm:ss' as const;
 
 /**
- * Nest `helper.formatDate` 互換のパターン整形（業務 TZ）。
- * `S` トークンは元 instant のミリ秒（Nest 正本）。
+ * Format an instant in the business TZ, compatible with the Nest `helper.formatDate`.
+ *
+ * Supported tokens: `YYYY` / `MM` / `DD` / `hh` / `mm` / `ss`, plus `S` for the source instant's
+ * milliseconds (matching the Nest reference implementation).
+ *
+ * @param instant - the UTC instant to format.
+ * @param pattern - the format pattern; defaults to {@link DEFAULT_BUSINESS_DATETIME_PATTERN}.
+ * @returns the formatted string.
+ * @example
+ * formatBusinessDateTime(new Date('2026-07-05T21:00:00Z')); // → '2026-07-06T06:00:00' (JST)
  */
 export function formatBusinessDateTime(instant: Date, pattern: string = DEFAULT_BUSINESS_DATETIME_PATTERN): string {
   const wall = toWallClock(instant);
@@ -116,7 +152,16 @@ export function formatBusinessDateTime(instant: Date, pattern: string = DEFAULT_
   return out;
 }
 
-/** JST 業務日時文字列 → UTC instant。`YYYY-MM-DD HH:mm:ss` / `T` 区切りを受け付ける。 */
+/**
+ * Parse a JST business date-time string into a UTC instant. Accepts a space or `T` separator
+ * (`YYYY-MM-DD HH:mm:ss` or `YYYY-MM-DDTHH:mm:ss`).
+ *
+ * @param value - the business date-time string to parse.
+ * @returns the corresponding UTC instant.
+ * @throws RangeError when `value` is not a valid business date-time.
+ * @example
+ * parseBusinessDateTime('2026-07-06 06:00:00'); // → 2026-07-05T21:00:00Z
+ */
 export function parseBusinessDateTime(value: BusinessDateTime): Date {
   const normalized = value.includes('T') ? value.replace('T', ' ') : value;
   const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(normalized);
@@ -128,19 +173,35 @@ export function parseBusinessDateTime(value: BusinessDateTime): Date {
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h) - offsetHours, Number(mi), Number(s), 0));
 }
 
-/** JST 業務暦日の 00:00:00 を表す UTC instant。 */
+/**
+ * The UTC instant of `00:00:00` on a JST business calendar date.
+ *
+ * @param date - the business date as `YYYY-MM-DD`.
+ * @returns the UTC instant at the start of that business day.
+ */
 export function startOfBusinessDay(date: BusinessDate): Date {
   return businessDateTimeInstant(date, '00:00:00');
 }
 
-/** JST 業務暦日の 23:59:59 を表す UTC instant。 */
+/**
+ * The UTC instant of `23:59:59` on a JST business calendar date.
+ *
+ * @param date - the business date as `YYYY-MM-DD`.
+ * @returns the UTC instant at the end of that business day.
+ */
 export function endOfBusinessDay(date: BusinessDate): Date {
   return businessDateTimeInstant(date, '23:59:59');
 }
 
 /**
- * JST 業務暦日 + 壁時計時刻 → UTC instant。
- * @example businessDateTimeInstant('2026-07-05', '06:00:00')
+ * Convert a JST business calendar date + wall-clock time to a UTC instant.
+ *
+ * @param date - the business date as `YYYY-MM-DD`.
+ * @param time - the wall-clock time as `HH:mm:ss` (or `HH:mm`).
+ * @returns the corresponding UTC instant.
+ * @throws RangeError when `date` or `time` is malformed.
+ * @example
+ * businessDateTimeInstant('2026-07-06', '06:00:00'); // → 2026-07-05T21:00:00Z
  */
 export function businessDateTimeInstant(date: BusinessDate, time: string): Date {
   const [y, mo, d] = parseYmd(date);
@@ -149,13 +210,29 @@ export function businessDateTimeInstant(date: BusinessDate, time: string): Date 
   return new Date(Date.UTC(y, mo - 1, d, h - offsetHours, mi, s, 0));
 }
 
-/** JST 業務暦日に日数を加算（暦日単位）。 */
+/**
+ * Add a number of calendar days to a JST business calendar date.
+ *
+ * @param date - the starting business date as `YYYY-MM-DD`.
+ * @param days - the number of calendar days to add (may be negative).
+ * @returns the resulting business date as `YYYY-MM-DD`.
+ * @example
+ * addBusinessDays('2026-07-06', 3); // → '2026-07-09'
+ */
 export function addBusinessDays(date: BusinessDate, days: number): BusinessDate {
   const anchor = businessDateTimeInstant(date, '12:00:00');
   return toBusinessDate(new Date(anchor.getTime() + days * 24 * 60 * 60 * 1000));
 }
 
-/** 業務暦日基準の満年齢（誕生日は instant ではなく BusinessDate）。 */
+/**
+ * The full years of age on a business calendar date (a birthday is a `BusinessDate`, not an instant).
+ *
+ * @param birthDate - the birth date as `YYYY-MM-DD`.
+ * @param asOfDate - the reference business date; defaults to {@link today}.
+ * @returns the age in completed years.
+ * @example
+ * ageOnBusinessDate('1990-07-10', '2026-07-06'); // → 35
+ */
 export function ageOnBusinessDate(birthDate: BusinessDate, asOfDate?: BusinessDate): number {
   const asOf = asOfDate ?? today();
   const [by, bm, bd] = parseYmd(birthDate);

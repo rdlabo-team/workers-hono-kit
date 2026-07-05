@@ -1,20 +1,25 @@
 /**
- * MySQL / Drizzle 向け JST ワイヤ変換と DATE 列正規化。
+ * JST wire conversion and DATE-column normalization for MySQL / Drizzle.
  *
  * @remarks
- * 業務時刻の意味論は {@link ../business-time/index.js | business-time} に集約する。
- * このモジュールは「MySQL 接続既定」「DATE 列の toDriver」、列 `customType` params のみを担う。
+ * Business-time semantics are consolidated in {@link ../business-time/index.js | business-time}. This
+ * module only owns the MySQL connection default, the DATE column's `toDriver`, and the column
+ * `customType` params.
  */
 
 import { normalizeBusinessDate } from '../business-time/index.js';
 import type { BusinessDate } from '../business-time/index.js';
 
-/** mysql2 接続 `timezone` 既定（既存 JST DB 運用）。 */
+/** Default mysql2 connection `timezone` (for the existing JST DB deployment). */
 export const MYSQL_TIMEZONE = '+09:00';
 
 /**
- * クライアント入力を MySQL `DATE` 列向け `YYYY-MM-DD`（JST 業務暦日）へ正規化。
- * ISO 8601 / `YYYY-MM-DD` / 空文字を受け付ける。`YYYY-MM-DD` は Date 化せずそのまま渡す。
+ * Normalize a client input to `YYYY-MM-DD` (a JST business calendar date) for a MySQL `DATE` column.
+ * Accepts ISO 8601 / `YYYY-MM-DD` / empty strings. A `YYYY-MM-DD` value is passed through without
+ * constructing a `Date`.
+ *
+ * @param value - the string or nullish input to normalize.
+ * @returns the business date as `YYYY-MM-DD`, or `null` when the input cannot be resolved.
  */
 export function toJstDate(value: string | null | undefined): BusinessDate | null {
   return normalizeBusinessDate(value ?? null);
