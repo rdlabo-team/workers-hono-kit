@@ -97,7 +97,7 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | `jstOnUpdateNow` | SQL expression for `ON UPDATE CURRENT_TIMESTAMP`. The `jstTimestamp` customType (and friends) do not support `.onUpdateNow()`, so pair it with `.$onUpdateFn(() => jstOnUpdateNow(fsp))`. |
 | `coerceDecimalNumber` / `decimalNumberParams` | DECIMAL normalization params (the `decimalNumber` column helper is usually enough). |
 | `DRIZZLE_ORM_OPTIONS` / `honoDrizzleConfig(options)` / `HonoDrizzleConfigOptions` | Shared Drizzle casing (`snake_case`) for both the runtime `drizzle()` call and `drizzle.config.ts`, keeping config ↔ runtime in sync. |
-| `resolveDbSecret(options, secretId?)` / `ResolvedDbSecret` | Resolve RDS-managed or plain DB credentials from AWS Secrets Manager for CI migrate / local tooling. |
+| `resolveDbSecret()` / `ResolvedDbSecret` | Resolve DB connection info from the `DB_SECRET` env var (an AWS RDS managed-secret JSON string) for CI migrate / local tooling. Returns `undefined` when `DB_SECRET` is unset; throws on invalid JSON or a missing required key. |
 | `baselineMigrations(options)` / `readBaselineEntry(migrationsFolder)` / `BaselineMigrationsOptions` / `BaselineResult` / `BaselineEntry` | Brownfield first-deploy helper: mark an existing `0000_*` migration as applied without re-running DDL. |
 
 #### Drizzle column helpers (`jstTimestamp` / `decimalNumber`, etc.)
