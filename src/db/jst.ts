@@ -1,47 +1,171 @@
 /**
- * Shared building blocks for normalizing JST (Asia/Tokyo) date/time values.
+ * MySQL / Drizzle 向け JST ワイヤ変換と DATE 列正規化。
  *
  * @remarks
- * JST normalization is applied at the column boundary as a write-time side effect, and neither
- * values nor types from `drizzle-orm` are imported here on purpose. Exporting a fully-built
- * `customType` column from the kit would cause type collisions when the kit and the consumer
- * resolve separate copies of `drizzle-orm` (the private `SQL` brand stops being nominally
- * compatible). Instead the kit ships only the params and helpers, and the consumer builds the
- * column with its own `customType`:
- *
- * ```ts
- * import { customType } from 'drizzle-orm/mysql-core';
- * import { jstTimestampParams, jstDateParams } from '@rdlabo/workers-hono-kit/db';
- *
- * export const jstTimestamp = (name: string, opts?: { fsp?: number }) =>
- *   customType<{ data: string | Date; driverData: string | Date }>(jstTimestampParams(opts?.fsp))(name);
- * export const jstDate = (name: string) =>
- *   customType<{ data: string | null; driverData: string | null }>(jstDateParams())(name);
- * ```
- *
- * `timestamp`/`datetime` columns omit `toDriver` and pass `Date` values straight through, so the
- * connection's `timezone: '+09:00'` default makes mysql2 format them as JST; pre-formatted strings
- * also pass through. Drizzle's native `mode: 'date'` is avoided because it stringifies `Date` to
- * UTC before the timezone layer, shifting values by -9h. `date` columns keep `toJstDate` because
- * MySQL `DATE` rejects ISO/empty strings and a JST day-boundary normalization is required.
+ * 業務時刻の意味論は {@link ../business-time/index.js | business-time} に集約する。
+ * このモジュールは「MySQL へどう渡すか」「DATE 列の toDriver」のみを担う。
  */
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+import {
+  formatBusinessDateTime,
+  toBusinessDate,
+  toBusinessDateTime,
+  today,
+  addBusinessDays,
+  businessDateTimeInstant,
+  ageOnBusinessDate,
+  type BusinessDate,
+  type BusinessDateTime,
+} from '../business-time/index.js';
+
+/** mysql2 接続 `timezone` 既定（既存 JST DB 運用）。 */
+export const MYSQL_TIMEZONE = '+09:00';
+
+/** @deprecated {@link MYSQL_TIMEZONE} と同値。 */
+export const DEFAULT_TZ_OFFSET_MINUTES = 540;
 
 /**
- * Normalize a client-supplied date to the `YYYY-MM-DD` (JST) form accepted by a MySQL `DATE` column.
- *
- * Accepts ISO 8601 (`...Z`), `YYYY-MM-DD`, or an empty string. Nullish, empty, or unparseable input
- * resolves to `null`.
- *
- * @remarks
- * MySQL `DATE` rejects ISO strings with `ER_TRUNCATED_WRONG_VALUE`, so this cannot be handled by the
- * driver alone; it is needed as the `toDriver` transform for a `date` column.
- *
- * @param value - the raw date string from the client (ISO 8601, `YYYY-MM-DD`, or empty), or nullish.
- * @returns the JST calendar date as `YYYY-MM-DD`, or `null` when the input is empty or unparseable.
+ * UTC instant を MySQL DATETIME 互換の JST 業務日時文字列へ。
+ * 中身は {@link toBusinessDateTime} と同じ（ワイヤ責務の明示用エイリアス）。
  */
-export function toJstDate(value: string | null | undefined): string | null {
+export function toMysqlDateTime(instant: Date): BusinessDateTime {
+  return toBusinessDateTime(instant);
+}
+
+/**
+ * `DB_TIMEZONE` 等の `+09:00` / `-05:00` / `Z` を分に変換する。
+ * mysql2 接続オプション専用。業務時刻は {@link BUSINESS_TIMEZONE} 固定。
+ *
+ * @deprecated フリートは JST 固定。接続は {@link MYSQL_TIMEZONE} を使う。
+ */
+export function parseTzOffsetMinutes(tz: string | undefined): number {
+  if (!tz || tz === 'Z') {
+    return tz === 'Z' ? 0 : DEFAULT_TZ_OFFSET_MINUTES;
+  }
+  const m = /^([+-])(\d{2}):?(\d{2})$/.exec(tz);
+  if (!m) {
+    return DEFAULT_TZ_OFFSET_MINUTES;
+  }
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (parseInt(m[2]!, 10) * 60 + parseInt(m[3]!, 10));
+}
+
+/** @deprecated {@link toBusinessDate} の内部用。新規コードは business-time を使う。 */
+export function toJstWallClock(date: Date): Date {
+  return new Date(date.getTime() + DEFAULT_TZ_OFFSET_MINUTES * 60_000);
+}
+
+/** @deprecated {@link toJstWallClock} の一般化。 */
+export function toTzWallClock(date: Date, offsetMinutes: number = DEFAULT_TZ_OFFSET_MINUTES): Date {
+  return new Date(date.getTime() + offsetMinutes * 60_000);
+}
+
+export type FormatJstDateOptions = {
+  offsetMinutes?: number;
+  nullIfFalsy?: boolean;
+  millisecondsSource?: 'wall' | 'instant';
+};
+
+/**
+ * @deprecated {@link formatBusinessDateTime} を使う。
+ * winecode 互換のため offset / millisecondsSource を残すが、JST 固定へ移行予定。
+ */
+export function formatJstDate(
+  date: Date | null | undefined,
+  format = 'YYYY-MM-DDThh:mm:ss',
+  options: FormatJstDateOptions = {},
+): string | null {
+  const { offsetMinutes = DEFAULT_TZ_OFFSET_MINUTES, nullIfFalsy = false } = options;
+  if (nullIfFalsy && !date) {
+    return null;
+  }
+  if (offsetMinutes !== DEFAULT_TZ_OFFSET_MINUTES) {
+    const wall = toTzWallClock(date as Date, offsetMinutes);
+    let out = format;
+    out = out.replace(/YYYY/g, String(wall.getUTCFullYear()));
+    out = out.replace(/MM/g, ('0' + (wall.getUTCMonth() + 1)).slice(-2));
+    out = out.replace(/DD/g, ('0' + wall.getUTCDate()).slice(-2));
+    out = out.replace(/hh/g, ('0' + wall.getUTCHours()).slice(-2));
+    out = out.replace(/mm/g, ('0' + wall.getUTCMinutes()).slice(-2));
+    out = out.replace(/ss/g, ('0' + wall.getUTCSeconds()).slice(-2));
+    return out;
+  }
+  return formatBusinessDateTime(date as Date, format);
+}
+
+/** @deprecated {@link ageOnBusinessDate} + {@link toBusinessDate} を使う。 */
+export function ageInJst(birthDate: Date, nowDate: Date = new Date()): number {
+  return ageOnBusinessDate(toBusinessDate(birthDate), today(nowDate));
+}
+
+/** @deprecated {@link ageInJst} の一般化。 */
+export function ageInTz(
+  birthDate: Date,
+  nowDate: Date = new Date(),
+  offsetMinutes: number = DEFAULT_TZ_OFFSET_MINUTES,
+): number {
+  if (offsetMinutes === DEFAULT_TZ_OFFSET_MINUTES) {
+    return ageInJst(birthDate, nowDate);
+  }
+  const nowWall = toTzWallClock(nowDate, offsetMinutes);
+  const birthWall = toTzWallClock(birthDate, offsetMinutes);
+  let age = nowWall.getUTCFullYear() - birthWall.getUTCFullYear();
+  const m = nowWall.getUTCMonth() - birthWall.getUTCMonth();
+  if (m < 0 || (m === 0 && nowWall.getUTCDate() < birthWall.getUTCDate())) {
+    age--;
+  }
+  return age;
+}
+
+/** @deprecated {@link today} / {@link addBusinessDays} を使う。 */
+export function jstDateString(ref: Date = new Date(), offsetDays = 0): BusinessDate {
+  return offsetDays === 0 ? today(ref) : addBusinessDays(today(ref), offsetDays);
+}
+
+/** @deprecated {@link jstDateString} の一般化。 */
+export function tzDateString(
+  ref: Date = new Date(),
+  offsetDays = 0,
+  offsetMinutes: number = DEFAULT_TZ_OFFSET_MINUTES,
+): string {
+  if (offsetMinutes === DEFAULT_TZ_OFFSET_MINUTES) {
+    return jstDateString(ref, offsetDays);
+  }
+  const wall = toTzWallClock(new Date(ref.getTime() + offsetDays * 24 * 60 * 60 * 1000), offsetMinutes);
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return `${wall.getUTCFullYear()}-${p(wall.getUTCMonth() + 1)}-${p(wall.getUTCDate())}`;
+}
+
+/**
+ * @deprecated {@link businessDateTimeInstant} + {@link today} / {@link addBusinessDays} を使う。
+ */
+export function jstBoundaryAsUtc(ref: Date, dayOffset: number, hour: number): Date {
+  const date = dayOffset === 0 ? today(ref) : addBusinessDays(today(ref), dayOffset);
+  return businessDateTimeInstant(date, `${String(hour).padStart(2, '0')}:00:00`);
+}
+
+/** @deprecated {@link jstBoundaryAsUtc} の一般化。 */
+export function tzBoundaryAsUtc(
+  ref: Date,
+  dayOffset: number,
+  hour: number,
+  offsetMinutes: number = DEFAULT_TZ_OFFSET_MINUTES,
+): Date {
+  if (offsetMinutes === DEFAULT_TZ_OFFSET_MINUTES) {
+    return jstBoundaryAsUtc(ref, dayOffset, hour);
+  }
+  const wall = toTzWallClock(ref, offsetMinutes);
+  const offsetHours = offsetMinutes / 60;
+  return new Date(
+    Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate() + dayOffset, hour - offsetHours, 0, 0, 0),
+  );
+}
+
+/**
+ * クライアント入力を MySQL `DATE` 列向け `YYYY-MM-DD`（JST 業務暦日）へ正規化。
+ * ISO 8601 / `YYYY-MM-DD` / 空文字を受け付ける。
+ */
+export function toJstDate(value: string | null | undefined): BusinessDate | null {
   if (!value) {
     return null;
   }
@@ -49,70 +173,17 @@ export function toJstDate(value: string | null | undefined): string | null {
   if (Number.isNaN(ms)) {
     return null;
   }
-  const jst = new Date(ms + JST_OFFSET_MS);
-  const p = (n: number): string => String(n).padStart(2, '0');
-  return `${jst.getUTCFullYear()}-${p(jst.getUTCMonth() + 1)}-${p(jst.getUTCDate())}`;
+  return toBusinessDate(new Date(ms));
 }
 
-/**
- * Build the params for a `customType` backing a MySQL `timestamp` column with `Date` pass-through.
- *
- * The column omits `toDriver`, so `Date` values flow straight to mysql2 and are formatted as JST by
- * the connection's `timezone: '+09:00'` default.
- *
- * @param fsp - optional fractional-seconds precision; when provided, emits `timestamp(fsp)`.
- * @returns the `customType` params object exposing the column's `dataType`.
- * @example
- * ```ts
- * import { customType } from 'drizzle-orm/mysql-core';
- * import { jstTimestampParams } from '@rdlabo/workers-hono-kit/db';
- *
- * const jstTimestamp = (name: string) =>
- *   customType<{ data: string | Date; driverData: string | Date }>(jstTimestampParams())(name);
- * ```
- */
 export const jstTimestampParams = (fsp?: number): { dataType: () => string } => ({
   dataType: () => (fsp != null ? `timestamp(${fsp})` : 'timestamp'),
 });
 
-/**
- * Build the params for a `customType` backing a MySQL `datetime` column with `Date` pass-through.
- *
- * Behaves like {@link jstTimestampParams} but emits a `datetime` data type; `Date` values pass
- * through and are formatted as JST by the connection's `timezone: '+09:00'` default.
- *
- * @param fsp - optional fractional-seconds precision; when provided, emits `datetime(fsp)`.
- * @returns the `customType` params object exposing the column's `dataType`.
- * @example
- * ```ts
- * import { customType } from 'drizzle-orm/mysql-core';
- * import { jstDatetimeParams } from '@rdlabo/workers-hono-kit/db';
- *
- * const jstDatetime = (name: string) =>
- *   customType<{ data: string | Date; driverData: string | Date }>(jstDatetimeParams())(name);
- * ```
- */
 export const jstDatetimeParams = (fsp?: number): { dataType: () => string } => ({
   dataType: () => (fsp != null ? `datetime(${fsp})` : 'datetime'),
 });
 
-/**
- * Build the params for a `customType` backing a MySQL `date` column with JST normalization.
- *
- * Unlike the timestamp/datetime params, this defines a `toDriver` transform that runs
- * {@link toJstDate} so client-supplied ISO/empty strings are normalized to a JST `YYYY-MM-DD` value
- * the column accepts.
- *
- * @returns the `customType` params object exposing the column's `dataType` and `toDriver`.
- * @example
- * ```ts
- * import { customType } from 'drizzle-orm/mysql-core';
- * import { jstDateParams } from '@rdlabo/workers-hono-kit/db';
- *
- * const jstDate = (name: string) =>
- *   customType<{ data: string | null; driverData: string | null }>(jstDateParams())(name);
- * ```
- */
 export const jstDateParams = (): {
   dataType: () => string;
   toDriver: (value: string | null) => string | null;

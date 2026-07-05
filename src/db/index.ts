@@ -30,7 +30,26 @@ export type { DzWriteResult } from './write-result.js';
 export { hyperdriveConnectionOptions, withMysqlConnections } from './connection.js';
 export type { HyperdriveLike, ExecutionContextLike } from './connection.js';
 
-export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst.js';
+export {
+  MYSQL_TIMEZONE,
+  toMysqlDateTime,
+  DEFAULT_TZ_OFFSET_MINUTES,
+  parseTzOffsetMinutes,
+  toTzWallClock,
+  toJstWallClock,
+  formatJstDate,
+  ageInTz,
+  ageInJst,
+  tzDateString,
+  jstDateString,
+  tzBoundaryAsUtc,
+  jstBoundaryAsUtc,
+  toJstDate,
+  jstTimestampParams,
+  jstDatetimeParams,
+  jstDateParams,
+} from './jst.js';
+export type { FormatJstDateOptions } from './jst.js';
 
 export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig, resolveDbSecret } from './orm-config.js';
 export type { HonoDrizzleConfigOptions, ResolvedDbSecret } from './orm-config.js';

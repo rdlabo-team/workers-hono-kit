@@ -1,6 +1,6 @@
 {
   "name": "@rdlabo/workers-hono-kit",
-  "version": "0.3.7",
+  "version": "0.3.10",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -54,6 +54,11 @@
       "types": "./dist/db/index.d.ts",
       "import": "./dist/db/index.js",
       "default": "./dist/db/index.js"
+    },
+    "./business-time": {
+      "types": "./dist/business-time/index.d.ts",
+      "import": "./dist/business-time/index.js",
+      "default": "./dist/business-time/index.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
