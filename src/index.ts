@@ -35,6 +35,7 @@ export { HttpStatus } from './http/http-status.js';
 export { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from './http/nest-error.js';
 export type { NestErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/nest-error.js';
 export { normalizeTrailingSlash } from './http/trailing-slash.js';
+export type { ExecutionContextLike } from './http/execution-context.js';
 
 // cache
 export { KVCache } from './cache/kv-cache.js';

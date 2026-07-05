@@ -1,5 +1,8 @@
 import { createConnection } from 'mysql2/promise';
 import type { Connection } from 'mysql2/promise';
+import type { ExecutionContextLike } from '../http/execution-context.js';
+
+export type { ExecutionContextLike } from '../http/execution-context.js';
 
 /**
  * Minimal structural shape of a Cloudflare Hyperdrive binding.
@@ -57,17 +60,6 @@ export function hyperdriveConnectionOptions(
     timezone: '+09:00',
     ...extra,
   };
-}
-
-/**
- * Minimal structural shape of a Workers `ExecutionContext`, limited to `waitUntil`.
- *
- * @remarks
- * Declared structurally to avoid a dependency on `@cloudflare/workers-types`.
- */
-export interface ExecutionContextLike {
-  /** Extend the request's lifetime until `promise` settles (used to close connections after the response). */
-  waitUntil(promise: Promise<unknown>): void;
 }
 
 /**

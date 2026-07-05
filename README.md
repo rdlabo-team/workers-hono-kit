@@ -66,12 +66,16 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `HttpStatus` | HTTP status enum identical to NestJS `@nestjs/common`. |
 | `createNestErrorHandler(options?)` / `NestErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to the NestJS exception-filter body (`{ statusCode, message, error? }`; `401` omits `error`). Configurable field order, reason phrases, error predicate, and unhandled-error report hook. |
 | `nestNotFoundHandler(c)` | `app.notFound()` handler with the Express/Nest default `{ message: 'Cannot METHOD path', error, statusCode }` 404 body. |
+| `normalizeTrailingSlash(request)` | Strip trailing slash(es) from the request URL before routing (Express/Nest parity). Does **not** 301-redirect — preserves POST/PUT/DELETE bodies. |
 | `NEST_REASON_PHRASES` | `{ 400, 401, 403, 404 }` → NestJS reason phrases. |
 | `createAuthMiddleware(options)` / `AuthMiddlewareOptions` | Factory for a Firebase-token auth middleware: reads the token header, verifies, resolves the DB user id, and stashes the result on the context. Omit `resolveUserId` for a token-only (login) guard. |
 | `ErrorReporter` / `ErrorReportContext` | Types for a `reportError`-style unhandled-error reporter (e.g. wired to Sentry), paired with `createNestErrorHandler`'s `onUnhandledError`. |
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
 | `KVCache` / `KVNamespace` / `KVCacheOptions` | Workers-KV cache-aside helper (key `appName+version+table_type_column`, sha256 for string ids, TTL clamped ≥60s). Set `appName` / `version` per application. |
 | `createStripeClient(secret, opts?)` / `verifyStripeWebhook(...)` / `CreateStripeClientOptions` | Workers-native Stripe client (fetch transport) + async webhook verification (SubtleCrypto). `apiVersion` optional (pin to a fixed Stripe API version). |
+| `sendInChunks(queue, messages, chunkSize?)` / `QueueLike` / `QueueSendMessage` | Send queue messages in bounded chunks to stay under the Workers subrequest cap per invocation. |
+| `processBatch(batch, handler, options?)` / `MessageBatchLike` / `QueueMessageLike` / `ProcessBatchOptions` / `ProcessBatchResult` | Process a queue batch with bounded concurrency (consumer-side counterpart to `sendInChunks`). |
+| `ExecutionContextLike` | Minimal `waitUntil`-only Workers execution context shape (for `withMysqlConnections` in worker entry modules without importing `./db`). |
 
 ### Data layer — `@rdlabo/workers-hono-kit/db`
 
@@ -81,6 +85,7 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | --- | --- |
 | `createHyperdriveDatabase(options)` | `DisposableDatabase` that lazily opens primary/replica connections from Hyperdrive bindings per request; `dispose()` closes them. |
 | `createMysqlDatabase(options)` | Assemble a `Database` from an already-connected Drizzle ORM + replica `QueryRunner`. |
+| `databaseFrom(orm, replica)` | Build a `Database` from an existing Drizzle instance + replica handle. |
 | `Database` / `DisposableDatabase` / `QueryRunner` / `TxOf` | The `read` / `write` / `transaction` API and its supporting types. |
 | `hyperdriveConnectionOptions(hyperdrive, overrides?)` / `HyperdriveLike` / `ExecutionContextLike` | Build mysql2 `createConnection` options from a Hyperdrive binding (`disableEval`, `decimalNumbers`, `timezone '+09:00'` by default). |
 | `withMysqlConnections(...)` | Open primary/replica connections, run a function, close them in `finally` (via `ctx.waitUntil`). |
@@ -88,6 +93,8 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | `insertIdOf` / `affectedRowsOf` / `insertedIdsOf` / `DzWriteResult` | Extract `insertId` / `affectedRows` (and derive contiguous bulk-insert ids) from a mysql2 write result. |
 | `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization applied at the Drizzle `customType` column boundary. |
 | `DRIZZLE_ORM_OPTIONS` / `honoDrizzleConfig(options)` / `HonoDrizzleConfigOptions` | Shared Drizzle casing (`snake_case`) for both the runtime `drizzle()` call and `drizzle.config.ts`, keeping config ↔ runtime in sync. |
+| `resolveDbSecret(options, secretId?)` / `ResolvedDbSecret` | Resolve RDS-managed or plain DB credentials from AWS Secrets Manager for CI migrate / local tooling. |
+| `baselineMigrations(options)` / `readBaselineEntry(migrationsFolder)` / `BaselineMigrationsOptions` / `BaselineResult` / `BaselineEntry` | Brownfield first-deploy helper: mark an existing `0000_*` migration as applied without re-running DDL. |
 
 ### Testing — `@rdlabo/workers-hono-kit/testing`
 
