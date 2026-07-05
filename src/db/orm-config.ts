@@ -136,7 +136,9 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
  * - 設定されている場合は「完全な接続情報」であることを要求し、**不正 JSON / 必須キー欠損は throw**
  *   （静かに localhost へフォールバックして事故らせない）。`port` のみ欠損時は 3306 を補う。
  */
-function resolveDbSecret(): { host: string; port: number; dbname: string; username: string; password: string } | undefined {
+function resolveDbSecret():
+  | { host: string; port: number; dbname: string; username: string; password: string }
+  | undefined {
   const raw = process.env.DB_SECRET;
   if (!raw) {
     return undefined;
