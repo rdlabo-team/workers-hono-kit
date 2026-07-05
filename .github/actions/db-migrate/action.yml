@@ -1,0 +1,54 @@
+name: 'DB migrate (SG-gated runner)'
+description: >
+  RDS が publicly accessible な hono フリート向けの DB マイグレーション実行 action。この runner の
+  egress IP を RDS SG に一時許可し、AWS Secrets Manager の RDS マネージド secret から接続情報を取得して
+  drizzle の `db:` スクリプトを実行し、成否に関わらず SG を必ず revoke する。VPC 不要・NAT 不要。
+  呼び出し側で `permissions: id-token: write` と `npm ci` を先に済ませておくこと。
+
+inputs:
+  role-to-assume:
+    description: 'OIDC で assume する AWS ロール ARN（例 GitHubDeploySAM）'
+    required: true
+  aws-region:
+    description: 'AWS リージョン（呼び出し側 CI で指定。OSS 都合でデフォルトは持たせない）'
+    required: true
+  sg-id:
+    description: 'RDS の Security Group ID（3306 を一時許可する対象）'
+    required: true
+  secret-id:
+    description: 'Secrets Manager の RDS マネージド secret 名（host/port/dbname/username/password を含む）'
+    required: true
+  command:
+    description: 'npm run で実行する drizzle スクリプト（db:migrate / db:baseline など）'
+    required: false
+    default: db:migrate
+  working-directory:
+    description: 'hono プロジェクトのパス'
+    required: false
+    default: ./hono
+
+runs:
+  using: composite
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v5
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
+    - name: Open RDS SG for runner IP
+      id: sg
+      shell: bash
+      run: |
+        IP=$(curl -fsSL https://api.ipify.org); echo "ipv4=$IP" >> "$GITHUB_OUTPUT"
+        aws ec2 authorize-security-group-ingress --group-id "${{ inputs.sg-id }}" --protocol tcp --port 3306 --cidr "$IP/32" || true
+    - name: Run drizzle ${{ inputs.command }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        DB_SECRET=$(aws secretsmanager get-secret-value --secret-id "${{ inputs.secret-id }}" --query SecretString --output text)
+        echo "::add-mask::$(echo "$DB_SECRET" | jq -r .password)"
+        DB_SECRET="$DB_SECRET" npm run ${{ inputs.command }}
+    - name: Revoke RDS SG for runner IP
+      if: always() && steps.sg.outputs.ipv4 != ''
+      shell: bash
+      run: aws ec2 revoke-security-group-ingress --group-id "${{ inputs.sg-id }}" --protocol tcp --port 3306 --cidr "${{ steps.sg.outputs.ipv4 }}/32" || true

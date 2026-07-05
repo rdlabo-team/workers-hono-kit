@@ -34,3 +34,6 @@ export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from 
 
 export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig } from './orm-config.js';
 export type { HonoDrizzleConfigOptions } from './orm-config.js';
+
+export { baselineMigrations, readBaselineEntry } from './migrate.js';
+export type { BaselineMigrationsOptions, BaselineResult, BaselineEntry } from './migrate.js';

@@ -95,6 +95,28 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
     tablesFilter,
     introspect,
   } = options;
+  // CI/本番の migrate は AWS Secrets Manager の RDS マネージド secret（キー
+  // host/port/dbname/username/password）を `DB_SECRET` にまるごと渡す運用を吸収する。JSON.parse で
+  // 解釈するので secret のキー名（host≠DB_HOST）差を map でき、password の特殊文字もシェル安全。
+  // 未設定（ローカル/db:generate）は従来どおり個別 env → デフォルトにフォールバック。
+  // DB_SECRET が在れば「完全な secret」として全接続情報をそれで確定する（欠損/不正は throw）。
+  // 未設定時のみ従来の個別 env → デフォルトにフォールバックする。
+  const secret = resolveDbSecret();
+  const dbCredentials = secret
+    ? {
+        host: secret.host,
+        port: secret.port,
+        user: secret.username,
+        password: secret.password,
+        database: secret.dbname,
+      }
+    : {
+        host: host ?? process.env.DB_HOST ?? '127.0.0.1',
+        port: port ?? Number(process.env.DB_PORT ?? 3306),
+        user: user ?? process.env.DB_USER ?? 'root',
+        password: password ?? process.env.DB_PASSWORD ?? 'root',
+        database,
+      };
   return {
     dialect: 'mysql' as const,
     schema,
@@ -102,12 +124,37 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
     casing: 'snake_case' as const,
     ...(tablesFilter ? { tablesFilter } : {}),
     ...(introspect ? { introspect } : {}),
-    dbCredentials: {
-      host: host ?? process.env.DB_HOST ?? '127.0.0.1',
-      port: port ?? Number(process.env.DB_PORT ?? 3306),
-      user: user ?? process.env.DB_USER ?? 'root',
-      password: password ?? process.env.DB_PASSWORD ?? 'root',
-      database,
-    },
+    dbCredentials,
   };
+}
+
+/**
+ * AWS RDS マネージド secret（`DB_SECRET` に入れた JSON 文字列）を解決する。
+ *
+ * @remarks
+ * - `DB_SECRET` 未設定 → `undefined`（ローカル/`db:generate` の正常フォールバック）。
+ * - 設定されている場合は「完全な接続情報」であることを要求し、**不正 JSON / 必須キー欠損は throw**
+ *   （静かに localhost へフォールバックして事故らせない）。`port` のみ欠損時は 3306 を補う。
+ */
+function resolveDbSecret(): { host: string; port: number; dbname: string; username: string; password: string } | undefined {
+  const raw = process.env.DB_SECRET;
+  if (!raw) {
+    return undefined;
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new Error('DB_SECRET is set but is not valid JSON (expected an AWS RDS managed secret string).');
+  }
+  const { host, dbname, username, password } = parsed;
+  if (
+    typeof host !== 'string' ||
+    typeof dbname !== 'string' ||
+    typeof username !== 'string' ||
+    typeof password !== 'string'
+  ) {
+    throw new Error('DB_SECRET must contain string host, dbname, username, password (AWS RDS managed secret shape).');
+  }
+  return { host, dbname, username, password, port: parsed.port === undefined ? 3306 : Number(parsed.port) };
 }

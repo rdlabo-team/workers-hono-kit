@@ -41,7 +41,8 @@
   ],
   "bin": {
     "workers-hono-kit-sync-dev-aws": "./scripts/sync-dev-aws.mjs",
-    "workers-hono-kit-check-subrequest-fanout": "./scripts/check-subrequest-fanout.mjs"
+    "workers-hono-kit-check-subrequest-fanout": "./scripts/check-subrequest-fanout.mjs",
+    "workers-hono-kit-db-baseline": "./scripts/db-baseline.mjs"
   },
   "exports": {
     ".": {
