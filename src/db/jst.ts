@@ -102,6 +102,14 @@ export function formatJstDate(
     out = out.replace(/hh/g, pad2(wall.getUTCHours()));
     out = out.replace(/mm/g, pad2(wall.getUTCMinutes()));
     out = out.replace(/ss/g, pad2(wall.getUTCSeconds()));
+    // `S` トークンは default-offset 分岐（formatBusinessDateTime）と同じく元 instant のミリ秒で埋める。
+    const matched = out.match(/S/g);
+    if (matched) {
+      const milliSeconds = String(date.getMilliseconds()).padStart(3, '0');
+      for (let i = 0; i < matched.length; i++) {
+        out = out.replace(/S/, milliSeconds.substring(i, i + 1));
+      }
+    }
     return out;
   }
   return formatBusinessDateTime(date, format);

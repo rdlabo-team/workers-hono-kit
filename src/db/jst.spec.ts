@@ -67,6 +67,13 @@ describe('formatJstDate [winecode parity]', () => {
     expect(formatJstDate(d, 'SSS', { millisecondsSource: 'wall' })).toBe('123');
   });
 
+  it('custom offset でも S トークンを ms で埋める（default-offset 分岐と整合）', () => {
+    const d = new Date('2026-01-01T00:00:00.045Z');
+    expect(formatJstDate(d, 'YYYY-MM-DD hh:mm:ss.SSS', { offsetMinutes: 0 })).toBe(
+      '2026-01-01 00:00:00.045',
+    );
+  });
+
   it('nullIfFalsy で falsy を null にする（tipsys）', () => {
     expect(formatJstDate(null, 'YYYY-MM-DD', { nullIfFalsy: true })).toBeNull();
     expect(formatJstDate(undefined, 'YYYY-MM-DD', { nullIfFalsy: true })).toBeNull();

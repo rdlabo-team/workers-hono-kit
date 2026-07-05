@@ -9,7 +9,10 @@
  * - 生 SQL `db.read` は接続 `decimalNumbers: true` が効く。列型の `fromDriver` は Drizzle `select` 経路向け。
  */
 
-export type DecimalNumberConfig = { precision: number; scale: number };
+export interface DecimalNumberConfig {
+  precision: number;
+  scale: number;
+}
 
 /**
  * mysql2 / Drizzle から届いた DECIMAL 値を JS `number | null` へ正規化する。

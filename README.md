@@ -104,7 +104,18 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 - `drizzle-orm` は **peer** のみ。kit は `drizzle-orm` を依存に含めない（publish 後も consumer の 1 本を使う）。
 - consumer は通常どおり `drizzle-orm` を `dependencies` に置くだけでよい。**`package.json` の `overrides` は不要**。
 - npm publish 物には `devDependencies` は含まれないため、インストール先で kit 専用の `drizzle-orm` は増えない（peer の 1 本のみ）。
-- 列ヘルパーは runtime で consumer の `drizzle-orm` を `import` する。型は `.default(sql\`…\`)` 連鎖のため declaration 上わざと緩い（`any`）。`$inferSelect` の列型は schema 定義側で維持される。
+- 列ヘルパーは runtime で consumer の `drizzle-orm` を `import` し、型は `customType` 推論そのまま（`MySqlCustomColumnBuilder<…>`）。`any` は使わないので consumer テーブルの `$inferSelect` に列の意味型が伝播する。
+- **前提: drizzle を単一コピーに解決すること。** drizzle の `SQL` は private フィールド `shouldInlineParams` を持つ**名目型**で、kit と consumer が別コピーを解決すると `jstTimestamp(…).default(sql\`…\`)` が `TS2345 separate declarations of a private property 'shouldInlineParams'` で全 schema 落ちする。`file:` リンク開発では kit 配下に `drizzle-orm` がネストして二重コピーになるため、**consumer の `tsconfig.json` で `drizzle-orm` を自身の 1 コピーへ固定**する:
+
+  ```jsonc
+  // tsconfig.json compilerOptions（既存 paths があればマージ）
+  "paths": {
+    "drizzle-orm": ["./node_modules/drizzle-orm"],
+    "drizzle-orm/*": ["./node_modules/drizzle-orm/*"]
+  }
+  ```
+
+  `moduleResolution: "Bundler"` なら `baseUrl` 不要（`baseUrl` 設定済みなら先頭 `./` は外す）。published 版（単一コピー）ではこの `paths` は無害。**overrides は不要。**
 - `file:` で kit を直リンクする開発では、kit リポジトリ側で `npm install` して peer を満たす（consumer 側で overrides を足さない）。
 
 **`CURRENT_TIMESTAMP` と接続 `timezone:'+09:00'` の違い**
