@@ -12,7 +12,11 @@ describe('normalizeTrailingSlash', () => {
 
   it('メソッドと body を維持する（POST は 301 にしない）', async () => {
     const req = normalizeTrailingSlash(
-      new Request('https://api.example.com/user/device/', { method: 'POST', body: JSON.stringify({ a: 1 }), headers: { 'content-type': 'application/json' } }),
+      new Request('https://api.example.com/user/device/', {
+        method: 'POST',
+        body: JSON.stringify({ a: 1 }),
+        headers: { 'content-type': 'application/json' },
+      }),
     );
     expect(new URL(req.url).pathname).toBe('/user/device');
     expect(req.method).toBe('POST');
