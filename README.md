@@ -41,6 +41,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 > | --- | --- | --- |
 > | `.` | `@rdlabo/workers-hono-kit` | Web-standard helpers (middleware, HTTP, Firebase, AWS, AI, Stripe, KV). |
 > | `./db` | `@rdlabo/workers-hono-kit/db` | MySQL data layer (mysql2 + Drizzle). |
+> | `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST 業務時刻 API（`toBusinessDateTime` / `normalizeBusinessDate` 等）。 |
 > | `./testing` | `@rdlabo/workers-hono-kit/testing` | Test helpers (mysql2 + Drizzle + fakes/fixtures). |
 
 ## API

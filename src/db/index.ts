@@ -30,28 +30,13 @@ export type { DzWriteResult } from './write-result.js';
 export { hyperdriveConnectionOptions, withMysqlConnections } from './connection.js';
 export type { HyperdriveLike, ExecutionContextLike } from './connection.js';
 
-/* eslint-disable @typescript-eslint/no-deprecated -- db barrel intentionally re-exports deprecated JST shims */
 export {
   MYSQL_TIMEZONE,
-  toMysqlDateTime,
-  DEFAULT_TZ_OFFSET_MINUTES,
-  parseTzOffsetMinutes,
-  toTzWallClock,
-  toJstWallClock,
-  formatJstDate,
-  ageInTz,
-  ageInJst,
-  tzDateString,
-  jstDateString,
-  tzBoundaryAsUtc,
-  jstBoundaryAsUtc,
   toJstDate,
   jstTimestampParams,
   jstDatetimeParams,
   jstDateParams,
 } from './jst.js';
-/* eslint-enable @typescript-eslint/no-deprecated */
-export type { FormatJstDateOptions } from './jst.js';
 
 export { coerceDecimalNumber, decimalNumberParams } from './decimal.js';
 export type { DecimalNumberConfig } from './decimal.js';
