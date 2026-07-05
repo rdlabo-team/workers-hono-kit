@@ -29,3 +29,7 @@ export {
   fakePrice,
   fakeSubscription,
 } from './stripe-fixtures.js';
+
+// In-memory Workers binding fakes (KV / Queues producer).
+export { fakeKv, fakeQueue } from './workers-bindings.js';
+export type { FakeQueue } from './workers-bindings.js';
