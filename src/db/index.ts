@@ -30,6 +30,7 @@ export type { DzWriteResult } from './write-result.js';
 export { hyperdriveConnectionOptions, withMysqlConnections } from './connection.js';
 export type { HyperdriveLike, ExecutionContextLike } from './connection.js';
 
+/* eslint-disable @typescript-eslint/no-deprecated -- db barrel intentionally re-exports deprecated JST shims */
 export {
   MYSQL_TIMEZONE,
   toMysqlDateTime,
@@ -49,7 +50,13 @@ export {
   jstDatetimeParams,
   jstDateParams,
 } from './jst.js';
+/* eslint-enable @typescript-eslint/no-deprecated */
 export type { FormatJstDateOptions } from './jst.js';
+
+export { coerceDecimalNumber, decimalNumberParams } from './decimal.js';
+export type { DecimalNumberConfig } from './decimal.js';
+
+export { jstTimestamp, jstDatetime, jstDate, decimalNumber, jstOnUpdateNow } from './columns.js';
 
 export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig, resolveDbSecret } from './orm-config.js';
 export type { HonoDrizzleConfigOptions, ResolvedDbSecret } from './orm-config.js';

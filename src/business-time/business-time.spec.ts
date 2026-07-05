@@ -5,12 +5,34 @@ import {
   businessDateTimeInstant,
   endOfBusinessDay,
   formatBusinessDateTime,
+  normalizeBusinessDate,
   parseBusinessDateTime,
   startOfBusinessDay,
   today,
   toBusinessDate,
   toBusinessDateTime,
 } from './index.js';
+
+describe('normalizeBusinessDate', () => {
+  it('YYYY-MM-DD 文字列は Date 化せずそのまま返す', () => {
+    expect(normalizeBusinessDate('1990-07-05')).toBe('1990-07-05');
+  });
+
+  it('ISO 8601 Z は JST 暦日へ変換する', () => {
+    expect(normalizeBusinessDate('1990-07-05T00:00:00Z')).toBe('1990-07-05');
+    expect(normalizeBusinessDate('1990-07-05T15:00:00Z')).toBe('1990-07-06');
+  });
+
+  it('Date instant は JST 暦日へ変換する', () => {
+    expect(normalizeBusinessDate(new Date('2026-01-01T00:00:00Z'))).toBe('2026-01-01');
+  });
+
+  it('nullish / 空 / 不正は null', () => {
+    expect(normalizeBusinessDate(null)).toBeNull();
+    expect(normalizeBusinessDate('')).toBeNull();
+    expect(normalizeBusinessDate('not-a-date')).toBeNull();
+  });
+});
 
 describe('toBusinessDate / today', () => {
   it('UTC を JST 業務暦日に変換する', () => {
@@ -37,10 +59,9 @@ describe('toBusinessDateTime / formatBusinessDateTime', () => {
     );
   });
 
-  it('tipsys 既定パターン（スペース区切り）', () => {
-    expect(formatBusinessDateTime(new Date('2026-01-01T00:00:00Z'), 'YYYY-MM-DD hh:mm:ss')).toBe(
-      '2026-01-01 09:00:00',
-    );
+  it('S トークンはミリ秒を3桁で埋める', () => {
+    const instant = new Date('2026-01-01T00:00:00.005Z');
+    expect(formatBusinessDateTime(instant, 'YYYY-MM-DDThh:mm:ss.SSS')).toBe('2026-01-01T09:00:00.005');
   });
 });
 

@@ -9,7 +9,8 @@
  * @packageDocumentation
  */
 
-import { BUSINESS_TIMEZONE, type BusinessDate, type BusinessDateTime } from './types.js';
+import { BUSINESS_TIMEZONE } from './types.js';
+import type { BusinessDate, BusinessDateTime } from './types.js';
 
 export { BUSINESS_TIMEZONE, type BusinessDate, type BusinessDateTime };
 
@@ -33,7 +34,7 @@ function parseHms(time: string): [number, number, number] {
   if (!m) {
     throw new RangeError(`Invalid business time: ${time}`);
   }
-  return [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)];
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
 }
 
 /** 参照 instant の JST 業務暦日。 */
@@ -45,6 +46,41 @@ export function today(ref: Date = new Date()): BusinessDate {
 export function toBusinessDate(instant: Date): BusinessDate {
   const wall = toWallClock(instant);
   return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())}`;
+}
+
+/**
+ * クライアント / DB 入力を JST 業務暦日 `YYYY-MM-DD` へ正規化する。
+ *
+ * - 既に `YYYY-MM-DD` の文字列は **Date 化せず**そのまま返す（誕生日は instant ではない）。
+ * - ISO 8601 等は instant 経由で JST 暦日へ変換。
+ * - nullish / 空 / 不正は `null`。
+ */
+export function normalizeBusinessDate(value: string | Date | null | undefined): BusinessDate | null {
+  if (value == null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+    return toBusinessDate(value);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const isoDatePrefix = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  if (isoDatePrefix && !trimmed.includes('T') && !trimmed.includes(' ')) {
+    return isoDatePrefix[1];
+  }
+  const ms = new Date(trimmed).getTime();
+  if (Number.isNaN(ms)) {
+    return null;
+  }
+  return toBusinessDate(new Date(ms));
 }
 
 /** UTC instant → JST 業務日時（`YYYY-MM-DD HH:mm:ss`）。 */
@@ -74,7 +110,7 @@ export function formatBusinessDateTime(
   out = out.replace(/ss/g, pad2(wall.getUTCSeconds()));
   const matched = out.match(/S/g);
   if (matched) {
-    const milliSeconds = pad2(instant.getMilliseconds()).slice(-3);
+    const milliSeconds = String(instant.getMilliseconds()).padStart(3, '0');
     const length = matched.length;
     for (let i = 0; i < length; i++) {
       out = out.replace(/S/, milliSeconds.substring(i, i + 1));

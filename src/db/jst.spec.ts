@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated -- tests cover deprecated JST shims kept for winecode compat */
 import { describe, it, expect } from 'vitest';
 import {
   ageInJst,
