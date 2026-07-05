@@ -20,7 +20,10 @@ describe('fakeQueue', () => {
 
   it('sendInChunks と組み合わせて subrequest 数を検証できる', async () => {
     const queue = fakeQueue<number>();
-    const batches = await sendInChunks(queue, Array.from({ length: 250 }, (_, i) => i));
+    const batches = await sendInChunks(
+      queue,
+      Array.from({ length: 250 }, (_, i) => i),
+    );
     expect(batches).toBe(3);
     expect(queue.batchCount).toBe(3);
     expect(queue.sent).toHaveLength(250);
