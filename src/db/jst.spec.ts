@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toJstDate } from './jst.js';
 
-describe('toJstDate', () => {
+describe('toJstDate (DATE 列 toDriver)', () => {
   it('returns null for nullish/blank input', () => {
     expect(toJstDate(null)).toBeNull();
     expect(toJstDate(undefined)).toBeNull();

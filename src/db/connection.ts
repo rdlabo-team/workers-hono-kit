@@ -1,6 +1,7 @@
 import { createConnection } from 'mysql2/promise';
 import type { Connection } from 'mysql2/promise';
 import type { ExecutionContextLike } from '../http/execution-context.js';
+import { MYSQL_TIMEZONE } from './jst.js';
 
 export type { ExecutionContextLike } from '../http/execution-context.js';
 
@@ -57,7 +58,7 @@ export function hyperdriveConnectionOptions(
     port: hyperdrive.port,
     disableEval: true,
     decimalNumbers: true,
-    timezone: '+09:00',
+    timezone: MYSQL_TIMEZONE,
     ...extra,
   };
 }

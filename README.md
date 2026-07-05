@@ -41,6 +41,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 > | --- | --- | --- |
 > | `.` | `@rdlabo/workers-hono-kit` | Web-standard helpers (middleware, HTTP, Firebase, AWS, AI, Stripe, KV). |
 > | `./db` | `@rdlabo/workers-hono-kit/db` | MySQL data layer (mysql2 + Drizzle). |
+> | `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST 業務時刻 API（`toBusinessDateTime` / `normalizeBusinessDate` 等）。 |
 > | `./testing` | `@rdlabo/workers-hono-kit/testing` | Test helpers (mysql2 + Drizzle + fakes/fixtures). |
 
 ## API
@@ -91,10 +92,41 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | `withMysqlConnections(...)` | Open primary/replica connections, run a function, close them in `finally` (via `ctx.waitUntil`). |
 | `retryWhenDeadlock(fn, retries?, delay?)` | Same deadlock-retry helper as the root export. |
 | `insertIdOf` / `affectedRowsOf` / `insertedIdsOf` / `DzWriteResult` | Extract `insertId` / `affectedRows` (and derive contiguous bulk-insert ids) from a mysql2 write result. |
-| `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization applied at the Drizzle `customType` column boundary. |
+| `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization params（高度な用途）。 |
+| `jstTimestamp` / `jstDatetime` / `jstDate` / `decimalNumber` | Drizzle 列ヘルパー（repo 側ラッパー不要）。 |
+| `jstOnUpdateNow` | `ON UPDATE CURRENT_TIMESTAMP` 用 SQL 式。`jstTimestamp` 等の customType は `.onUpdateNow()` 非対応のため `.$onUpdateFn(() => jstOnUpdateNow(fsp))` と併用。 |
+| `coerceDecimalNumber` / `decimalNumberParams` | DECIMAL 正規化 params（通常は `decimalNumber` 列ヘルパーで十分）。 |
 | `DRIZZLE_ORM_OPTIONS` / `honoDrizzleConfig(options)` / `HonoDrizzleConfigOptions` | Shared Drizzle casing (`snake_case`) for both the runtime `drizzle()` call and `drizzle.config.ts`, keeping config ↔ runtime in sync. |
 | `resolveDbSecret(options, secretId?)` / `ResolvedDbSecret` | Resolve RDS-managed or plain DB credentials from AWS Secrets Manager for CI migrate / local tooling. |
 | `baselineMigrations(options)` / `readBaselineEntry(migrationsFolder)` / `BaselineMigrationsOptions` / `BaselineResult` / `BaselineEntry` | Brownfield first-deploy helper: mark an existing `0000_*` migration as applied without re-running DDL. |
+
+#### Drizzle 列ヘルパー（`jstTimestamp` / `decimalNumber` 等）
+
+- `drizzle-orm` は **peer** のみ。kit は `drizzle-orm` を依存に含めない（publish 後も consumer の 1 本を使う）。
+- consumer は通常どおり `drizzle-orm` を `dependencies` に置くだけでよい。**`package.json` の `overrides` は不要**。
+- npm publish 物には `devDependencies` は含まれないため、インストール先で kit 専用の `drizzle-orm` は増えない（peer の 1 本のみ）。
+- 列ヘルパーは runtime で consumer の `drizzle-orm` を `import` し、型は `customType` 推論そのまま（`MySqlCustomColumnBuilder<…>`）。`any` は使わないので consumer テーブルの `$inferSelect` に列の意味型が伝播する。
+- **前提: drizzle を単一コピーに解決すること。** drizzle の `SQL` は private フィールド `shouldInlineParams` を持つ**名目型**で、kit と consumer が別コピーを解決すると `jstTimestamp(…).default(sql\`…\`)` が `TS2345 separate declarations of a private property 'shouldInlineParams'` で全 schema 落ちする。`file:` リンク開発では kit 配下に `drizzle-orm` がネストして二重コピーになるため、**consumer の `tsconfig.json` で `drizzle-orm` を自身の 1 コピーへ固定**する:
+
+  ```jsonc
+  // tsconfig.json compilerOptions（既存 paths があればマージ）
+  "paths": {
+    "drizzle-orm": ["./node_modules/drizzle-orm"],
+    "drizzle-orm/*": ["./node_modules/drizzle-orm/*"]
+  }
+  ```
+
+  `moduleResolution: "Bundler"` なら `baseUrl` 不要（`baseUrl` 設定済みなら先頭 `./` は外す）。published 版（単一コピー）ではこの `paths` は無害。**overrides は不要。**
+- `file:` で kit を直リンクする開発では、kit リポジトリ側で `npm install` して peer を満たす（consumer 側で overrides を足さない）。
+
+**`CURRENT_TIMESTAMP` と接続 `timezone:'+09:00'` の違い**
+
+| 経路 | 誰が時刻を決めるか | JST との関係 |
+| --- | --- | --- |
+| アプリが `Date` を bind（INSERT/UPDATE） | mysql2 + 接続 `timezone:'+09:00'` | ワイヤ上は JST として扱われる（`datetime-wire` テスト） |
+| `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` | MySQL サーバ（セッション `time_zone`） | 接続オプションとは**別経路**。RDS の `time_zone` が `+09:00` なら JST、UTC なら UTC |
+
+`jstTimestamp` / `jstDatetime` は読書の pass-through と DATE 正規化のみ担当し、DB 既定値の時刻帯は変えない。`ON UPDATE` が必要な列は `.$onUpdateFn(() => jstOnUpdateNow(6))` で DDL 意図を維持する。
 
 ### Testing — `@rdlabo/workers-hono-kit/testing`
 

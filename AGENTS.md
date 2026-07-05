@@ -10,6 +10,7 @@ Shared infrastructure toolkit for Hono + Cloudflare Workers APIs. Published to n
 |---------|-------------|-------|
 | `.` | `@rdlabo/workers-hono-kit` | Web-standard only (middleware, HTTP helpers, Firebase, AWS, Stripe, AI Gateway, KV cache) |
 | `./db` | `@rdlabo/workers-hono-kit/db` | MySQL data layer (requires `mysql2` + `drizzle-orm` peers) |
+| `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST 業務時刻（`toBusinessDateTime`, `normalizeBusinessDate`, `businessDateTimeInstant` 等） |
 | `./testing` | `@rdlabo/workers-hono-kit/testing` | Test helpers (requires `mysql2` + `drizzle-orm` peers) |
 
 The root entry point must never depend on Node.js APIs or `mysql2`; it runs on `workerd`.

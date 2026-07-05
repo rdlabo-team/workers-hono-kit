@@ -30,7 +30,12 @@ export type { DzWriteResult } from './write-result.js';
 export { hyperdriveConnectionOptions, withMysqlConnections } from './connection.js';
 export type { HyperdriveLike, ExecutionContextLike } from './connection.js';
 
-export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst.js';
+export { MYSQL_TIMEZONE, toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst.js';
+
+export { coerceDecimalNumber, decimalNumberParams } from './decimal.js';
+export type { DecimalNumberConfig } from './decimal.js';
+
+export { jstTimestamp, jstDatetime, jstDate, decimalNumber, jstOnUpdateNow } from './columns.js';
 
 export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig, resolveDbSecret } from './orm-config.js';
 export type { HonoDrizzleConfigOptions, ResolvedDbSecret } from './orm-config.js';
