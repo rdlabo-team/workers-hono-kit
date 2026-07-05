@@ -128,6 +128,15 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
   };
 }
 
+/** {@link resolveDbSecret} の戻り値（正規化済みの接続情報）。 */
+export interface ResolvedDbSecret {
+  host: string;
+  port: number;
+  dbname: string;
+  username: string;
+  password: string;
+}
+
 /**
  * AWS RDS マネージド secret（`DB_SECRET` に入れた JSON 文字列）を解決する。
  *
@@ -135,10 +144,10 @@ export function honoDrizzleConfig(options: HonoDrizzleConfigOptions) {
  * - `DB_SECRET` 未設定 → `undefined`（ローカル/`db:generate` の正常フォールバック）。
  * - 設定されている場合は「完全な接続情報」であることを要求し、**不正 JSON / 必須キー欠損は throw**
  *   （静かに localhost へフォールバックして事故らせない）。`port` のみ欠損時は 3306 を補う。
+ *
+ * `honoDrizzleConfig`（db:migrate）と `workers-hono-kit-db-baseline` bin の双方が同じ解釈を使う。
  */
-function resolveDbSecret():
-  | { host: string; port: number; dbname: string; username: string; password: string }
-  | undefined {
+export function resolveDbSecret(): ResolvedDbSecret | undefined {
   const raw = process.env.DB_SECRET;
   if (!raw) {
     return undefined;

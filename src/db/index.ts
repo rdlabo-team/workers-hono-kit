@@ -32,8 +32,8 @@ export type { HyperdriveLike, ExecutionContextLike } from './connection.js';
 
 export { toJstDate, jstTimestampParams, jstDatetimeParams, jstDateParams } from './jst.js';
 
-export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig } from './orm-config.js';
-export type { HonoDrizzleConfigOptions } from './orm-config.js';
+export { DRIZZLE_ORM_OPTIONS, honoDrizzleConfig, resolveDbSecret } from './orm-config.js';
+export type { HonoDrizzleConfigOptions, ResolvedDbSecret } from './orm-config.js';
 
 export { baselineMigrations, readBaselineEntry } from './migrate.js';
 export type { BaselineMigrationsOptions, BaselineResult, BaselineEntry } from './migrate.js';

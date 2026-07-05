@@ -15,6 +15,7 @@
 //   npx workers-hono-kit-db-baseline [--migrations ./drizzle]
 import { createConnection } from 'mysql2/promise';
 import { baselineMigrations } from '../dist/db/migrate.js';
+import { resolveDbSecret } from '../dist/db/index.js';
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -22,16 +23,28 @@ function arg(name) {
 }
 
 const migrationsFolder = arg('migrations') ?? process.env.MIGRATIONS_DIR ?? './drizzle';
-const conn = {
-  host: process.env.DB_HOST ?? '127.0.0.1',
-  port: Number(process.env.DB_PORT ?? '3306'),
-  user: process.env.DB_USER ?? 'root',
-  password: process.env.DB_PASSWORD ?? 'root',
-  database: process.env.DB_NAME,
-};
+// db:migrate（honoDrizzleConfig）と同じ DB_SECRET 解釈を共有する。CI/本番は AWS Secrets Manager の
+// RDS マネージド secret を DB_SECRET に渡す運用（不正/欠損は resolveDbSecret が throw）。未設定時は
+// 従来の個別 DB_* env にフォールバック。
+const secret = resolveDbSecret();
+const conn = secret
+  ? {
+      host: secret.host,
+      port: secret.port,
+      user: secret.username,
+      password: secret.password,
+      database: secret.dbname,
+    }
+  : {
+      host: process.env.DB_HOST ?? '127.0.0.1',
+      port: Number(process.env.DB_PORT ?? '3306'),
+      user: process.env.DB_USER ?? 'root',
+      password: process.env.DB_PASSWORD ?? 'root',
+      database: process.env.DB_NAME,
+    };
 
 if (!conn.database) {
-  console.error('[db:baseline] DB_NAME is required.');
+  console.error('[db:baseline] DB_NAME (or DB_SECRET) is required.');
   process.exit(1);
 }
 
