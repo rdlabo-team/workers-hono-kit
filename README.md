@@ -74,7 +74,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
 | `KVCache` / `KVNamespace` / `KVCacheOptions` | Workers-KV cache-aside helper (key `appName+version+table_type_column`, sha256 for string ids, TTL clamped ≥60s). Set `appName` / `version` per application. |
 | `createStripeClient(secret, opts?)` / `verifyStripeWebhook(...)` / `CreateStripeClientOptions` | Workers-native Stripe client (fetch transport) + async webhook verification (SubtleCrypto). `apiVersion` optional (pin to a fixed Stripe API version). |
-| `sendInChunks(queue, messages, chunkSize?)` / `QueueLike` / `QueueSendMessage` | Send queue messages in bounded chunks to stay under the Workers subrequest cap per invocation. |
+| `sendInChunks(queue, messages, options?)` / `QueueLike` / `QueueSendMessage` | Send queue messages in bounded chunks to stay under the Workers subrequest cap per invocation. `options.chunkSize` sets the per-batch size (defaults to and is capped at 100). |
 | `processBatch(batch, handler, options?)` / `MessageBatchLike` / `QueueMessageLike` / `ProcessBatchOptions` / `ProcessBatchResult` | Process a queue batch with bounded concurrency (consumer-side counterpart to `sendInChunks`). |
 | `ExecutionContextLike` | Minimal `waitUntil`-only Workers execution context shape (for `withMysqlConnections` in worker entry modules without importing `./db`). |
 
@@ -93,6 +93,7 @@ Requires the `drizzle-orm` and `mysql2` peers. Reads run against a replica via r
 | `retryWhenDeadlock(fn, retries?, delay?)` | Same deadlock-retry helper as the root export. |
 | `insertIdOf` / `affectedRowsOf` / `insertedIdsOf` / `DzWriteResult` | Extract `insertId` / `affectedRows` (and derive contiguous bulk-insert ids) from a mysql2 write result. |
 | `toJstDate` / `jstTimestampParams` / `jstDatetimeParams` / `jstDateParams` | JST date/time normalization params (advanced use). |
+| `MYSQL_TIMEZONE` | Default mysql2 connection `timezone` (`'+09:00'`) for the JST DB deployment. |
 | `jstTimestamp` / `jstDatetime` / `jstDate` / `decimalNumber` | Drizzle column helpers (no repo-side wrapper needed). |
 | `jstOnUpdateNow` | SQL expression for `ON UPDATE CURRENT_TIMESTAMP`. The `jstTimestamp` customType (and friends) do not support `.onUpdateNow()`, so pair it with `.$onUpdateFn(() => jstOnUpdateNow(fsp))`. |
 | `coerceDecimalNumber` / `decimalNumberParams` | DECIMAL normalization params (the `decimalNumber` column helper is usually enough). |
@@ -400,7 +401,7 @@ await testDb.resetSchema();
 const pool = testDb.createTestPool();
 
 const firebase = new FakeFirebaseVerifier();
-firebase.register('uid-1', { email: 'a@example.com' });
+firebase.register('token-1', { uid: 'uid-1', email: 'a@example.com' });
 
 const gateway = configurableFake<PaymentGateway>({ charge: async () => ({ ok: true }) }, 'PaymentGateway');
 ```
