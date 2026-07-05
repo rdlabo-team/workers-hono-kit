@@ -96,10 +96,7 @@ export const DEFAULT_BUSINESS_DATETIME_PATTERN = 'YYYY-MM-DDThh:mm:ss' as const;
  * Nest `helper.formatDate` 互換のパターン整形（業務 TZ）。
  * `S` トークンは元 instant のミリ秒（Nest 正本）。
  */
-export function formatBusinessDateTime(
-  instant: Date,
-  pattern: string = DEFAULT_BUSINESS_DATETIME_PATTERN,
-): string {
+export function formatBusinessDateTime(instant: Date, pattern: string = DEFAULT_BUSINESS_DATETIME_PATTERN): string {
   const wall = toWallClock(instant);
   let out = pattern;
   out = out.replace(/YYYY/g, String(wall.getUTCFullYear()));

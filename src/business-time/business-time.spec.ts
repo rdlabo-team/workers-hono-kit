@@ -54,9 +54,7 @@ describe('toBusinessDateTime / formatBusinessDateTime', () => {
   });
 
   it('カスタムパターン（foodlabel 既定）', () => {
-    expect(formatBusinessDateTime(new Date('2026-01-01T00:00:00Z'), 'YYYY-MM-DDThh:mm:ss')).toBe(
-      '2026-01-01T09:00:00',
-    );
+    expect(formatBusinessDateTime(new Date('2026-01-01T00:00:00Z'), 'YYYY-MM-DDThh:mm:ss')).toBe('2026-01-01T09:00:00');
   });
 
   it('S トークンはミリ秒を3桁で埋める', () => {
@@ -67,9 +65,7 @@ describe('toBusinessDateTime / formatBusinessDateTime', () => {
 
 describe('businessDateTimeInstant / parseBusinessDateTime', () => {
   it('JST 6:00 → UTC instant（talk 境界）', () => {
-    expect(businessDateTimeInstant('2026-06-15', '06:00:00').toISOString()).toBe(
-      '2026-06-14T21:00:00.000Z',
-    );
+    expect(businessDateTimeInstant('2026-06-15', '06:00:00').toISOString()).toBe('2026-06-14T21:00:00.000Z');
   });
 
   it('parse ↔ to が往復一致する', () => {
