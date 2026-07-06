@@ -1,5 +1,3 @@
-import { Hono } from 'hono';
-import { requestId } from 'hono/request-id';
 import { describe, expect, it, vi } from 'vitest';
 import { findMysqlDriverError, logMysqlDriverError } from './mysql-driver-error.js';
 
