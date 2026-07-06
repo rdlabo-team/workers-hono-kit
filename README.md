@@ -65,7 +65,9 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `getAppInfo(c)` / `AppInfo` | Read `x-amz-meta-version` / `x-amz-meta-uuid`. |
 | `resolveAppEnv(env)` / `isProductionEnv(env)` / `AppEnv` | Resolve `'development'` / `'production'` from `env.APP_ENV` (defaults to `'production'` for safety). |
 | `HttpStatus` | HTTP status enum identical to NestJS `@nestjs/common`. |
-| `createNestErrorHandler(options?)` / `NestErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to the NestJS exception-filter body (`{ statusCode, message, error? }`; `401` omits `error`). Configurable field order, reason phrases, error predicate, and unhandled-error report hook. |
+| `createNestErrorHandler(options?)` / `NestErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to the NestJS exception-filter body (`{ statusCode, message, error? }`; `401` omits `error`). Configurable field order, reason phrases, error predicate, and unhandled-error report hook. Unhandled errors log via `console.error` (mysql2 errors include `sqlMessage` / `errno` when detectable). |
+| `createQueryFailedNestErrorHandler(options)` / `QueryFailedClassifier` / `ClassifiedDbError` | Compose a NestJS `QueryFailedExceptionFilter` analog **before** `createNestErrorHandler`: consumer supplies `classify(err)` (parity-critical messages stay in the app); classified DB errors log (`warn` for 400, `error` for 500) and trigger `onUnhandledError` on 500 only. |
+| `findMysqlDriverError(err)` / `logMysqlDriverError(err, statusCode)` / `reportClassifiedDbError(...)` | Low-level mysql2 driver-error detection (follows `err.cause`), structured logging, and classify-path reporting helpers. |
 | `nestNotFoundHandler(c)` | `app.notFound()` handler with the Express/Nest default `{ message: 'Cannot METHOD path', error, statusCode }` 404 body. |
 | `normalizeTrailingSlash(request)` | Strip trailing slash(es) from the request URL before routing (Express/Nest parity). Does **not** 301-redirect — preserves POST/PUT/DELETE bodies. |
 | `NEST_REASON_PHRASES` | `{ 400, 401, 403, 404 }` → NestJS reason phrases. |
@@ -294,6 +296,24 @@ app.onError(
     fieldOrder: 'message-first', // emit { message, error, statusCode } instead of statusCode-first
     onUnhandledError: (err, c) => container.reportError?.(err, { requestId: c.get('requestId') }),
     isHttpError: (e): e is HttpError => e instanceof HttpError, // a custom error class with a `.body` escape hatch
+  }),
+);
+```
+
+**Important:** `Sentry.withSentry` does **not** capture errors handled by `app.onError`. Wire
+`onUnhandledError` → `Sentry.captureException` explicitly (mirrors Nest `SentryGlobalFilter`).
+
+Repos with a Nest `QueryFailedExceptionFilter` (e.g. odss-mobile) should use
+`createQueryFailedNestErrorHandler` so classified DB errors still log and report to Sentry:
+
+```ts
+import { createQueryFailedNestErrorHandler } from '@rdlabo/workers-hono-kit';
+
+app.onError(
+  createQueryFailedNestErrorHandler({
+    fieldOrder: 'message-first',
+    classify: classifyQueryFailed, // app-local parity (Japanese messages, errno rules)
+    onUnhandledError: (err, c) => container.reportError?.(err, { requestId: c.get('requestId') }),
   }),
 );
 ```

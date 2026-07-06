@@ -1,5 +1,6 @@
 import type { Context, Env } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { findMysqlDriverError, logMysqlDriverError } from './mysql-driver-error.js';
 
 /**
  * Reason phrases attached by the NestJS default exception filter, keyed by HTTP status code.
@@ -179,7 +180,11 @@ export function createNestErrorHandler<E extends Env = Env>(options: NestErrorHa
     } catch {
       // Reporting must never change the behavior of the error response.
     }
-    console.error(err);
+    if (findMysqlDriverError(err)) {
+      logMysqlDriverError(err, 500);
+    } else {
+      console.error(err);
+    }
     return c.json(internalServerErrorBody as object, 500);
   };
 }

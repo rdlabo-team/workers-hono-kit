@@ -36,6 +36,17 @@ export type { AppEnv } from './http/app-env.js';
 export { HttpStatus } from './http/http-status.js';
 export { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from './http/nest-error.js';
 export type { NestErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/nest-error.js';
+export { findMysqlDriverError, logMysqlDriverError } from './http/mysql-driver-error.js';
+export type { MysqlDriverErrorLike } from './http/mysql-driver-error.js';
+export {
+  createQueryFailedNestErrorHandler,
+  reportClassifiedDbError,
+} from './http/query-failed-error.js';
+export type {
+  ClassifiedDbError,
+  QueryFailedClassifier,
+  QueryFailedNestErrorHandlerOptions,
+} from './http/query-failed-error.js';
 export { normalizeTrailingSlash } from './http/trailing-slash.js';
 export type { ExecutionContextLike } from './http/execution-context.js';
 
