@@ -70,6 +70,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `normalizeTrailingSlash(request)` | Strip trailing slash(es) from the request URL before routing (Express/Nest parity). Does **not** 301-redirect — preserves POST/PUT/DELETE bodies. |
 | `NEST_REASON_PHRASES` | `{ 400, 401, 403, 404 }` → NestJS reason phrases. |
 | `createAuthMiddleware(options)` / `AuthMiddlewareOptions` | Factory for a Firebase-token auth middleware: reads the token header, verifies, resolves the DB user id, and stashes the result on the context. Omit `resolveUserId` for a token-only (login) guard. |
+| `perfLog(options?)` / `PerfLogOptions` / `AnalyticsEngineDatasetLike` | Middleware that records one per-request latency data point (`t_app`, colo, cold/warm, route, status) and emits it to **Workers Logs** (`console.log`) and/or **Workers Analytics Engine** (`writeDataPoint`). Lets you measure low-traffic Workers without a live `wrangler tail`. |
 | `ErrorReporter` / `ErrorReportContext` | Types for a `reportError`-style unhandled-error reporter (e.g. wired to Sentry), paired with `createNestErrorHandler`'s `onUnhandledError`. |
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
 | `KVCache` / `KVNamespace` / `KVCacheOptions` | Workers-KV cache-aside helper (key `appName+version+table_type_column`, sha256 for string ids, TTL clamped ≥60s). Set `appName` / `version` per application. |
@@ -328,6 +329,47 @@ const tokenAuth = createAuthMiddleware<AppEnv, UserRecord>({
   onFailure: (_e, c) => c.json({ message: 'Unauthorized', statusCode: 401 }, 401),
 });
 ```
+
+### Latency instrumentation (`perfLog`)
+
+Records one data point per request — `t_app` (time inside the app), `colo`, `cold`/`warm`, matched
+route, `status` — and ships it to **Workers Logs** and/or **Workers Analytics Engine**. This lets you
+measure a low-traffic Worker after the fact (retained + queryable) instead of watching a live
+`wrangler tail`. Register it first so it wraps everything.
+
+```ts
+import { perfLog } from '@rdlabo/workers-hono-kit';
+
+// A) app served with env (`app.fetch(req, env, ctx)`): bare — reads `PERF` (Analytics Engine
+//    dataset binding) and `PERF_LOG === '1'` (Workers Logs) off `c.env`.
+app.use('*', perfLog());
+
+// B) app built without Hono env (`createApp(container).fetch(req)`): pass bindings explicitly.
+app.use('*', perfLog({ console: env.PERF_LOG === '1', dataset: env.PERF }));
+```
+
+```toml
+# wrangler.toml — dataset is created on first write (no provisioning); needs [observability] for Logs.
+[[analytics_engine_datasets]]
+binding = "PERF"
+dataset = "myapp_perf"
+```
+
+Query percentiles by route/colo with the Analytics Engine SQL API:
+
+```sql
+SELECT blob1 AS path, blob2 AS colo,
+       quantileWeighted(0.5)(double1, _sample_interval) AS p50,
+       quantileWeighted(0.9)(double1, _sample_interval) AS p90
+FROM myapp_perf WHERE timestamp > now() - INTERVAL '7' DAY
+GROUP BY path, colo ORDER BY p90 DESC
+```
+
+> **Scope of `t_app`**: it covers everything *inside* the app; work done in `fetch` *before* the app
+> (e.g. secrets fetch / DB connect in `createApp(container)` vs. building the container in `fetch`) is
+> not comparable across differently-wired apps. Instrument the `fetch` seam if you need a secrets/connect
+> cold breakdown. On production Workers `Date.now()` only advances at I/O boundaries, so `t_app` ≈ I/O
+> wait, not CPU time.
 
 ### AI Gateway
 

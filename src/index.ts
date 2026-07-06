@@ -23,6 +23,8 @@ export type {
 export { zNum, zNumNullable, zNumOptional, zNumWithDefault } from './middleware/zod-coerce.js';
 export { createAuthMiddleware } from './middleware/auth.js';
 export type { AuthMiddlewareOptions } from './middleware/auth.js';
+export { perfLog } from './middleware/perf-log.js';
+export type { PerfLogOptions, AnalyticsEngineDatasetLike } from './middleware/perf-log.js';
 
 // http
 export { getUserProtocol } from './http/user-protocol.js';
