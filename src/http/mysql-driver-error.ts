@@ -40,8 +40,7 @@ export function findMysqlDriverError(err: unknown, seen = new Set<unknown>()): M
 export function logMysqlDriverError(err: unknown, statusCode: number): void {
   const driver = findMysqlDriverError(err);
   const rawMessage = driver?.sqlMessage ?? driver?.message ?? (err instanceof Error ? err.message : String(err));
-  const detail =
-    driver === null ? undefined : { errno: driver.errno, sql: driver.sql, code: driver.code };
+  const detail = driver === null ? undefined : { errno: driver.errno, sql: driver.sql, code: driver.code };
   const line = `QueryFailedError (${statusCode}): ${rawMessage}`;
 
   if (statusCode >= 500) {

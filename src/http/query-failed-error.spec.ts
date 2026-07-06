@@ -30,8 +30,12 @@ describe('createQueryFailedNestErrorHandler', () => {
   const classify = (err: unknown): ClassifiedDbError | null => {
     const e = err as { cause?: unknown };
     const driver = (e.cause ?? err) as { errno?: number; sqlMessage?: string };
-    if (typeof driver.errno !== 'number') return null;
-    if (driver.errno === 1062) return { statusCode: 400, message: 'duplicate' };
+    if (typeof driver.errno !== 'number') {
+      return null;
+    }
+    if (driver.errno === 1062) {
+      return { statusCode: 400, message: 'duplicate' };
+    }
     return { statusCode: 500, message: 'db error' };
   };
 

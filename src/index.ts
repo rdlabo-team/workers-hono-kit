@@ -38,10 +38,7 @@ export { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from
 export type { NestErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/nest-error.js';
 export { findMysqlDriverError, logMysqlDriverError } from './http/mysql-driver-error.js';
 export type { MysqlDriverErrorLike } from './http/mysql-driver-error.js';
-export {
-  createQueryFailedNestErrorHandler,
-  reportClassifiedDbError,
-} from './http/query-failed-error.js';
+export { createQueryFailedNestErrorHandler, reportClassifiedDbError } from './http/query-failed-error.js';
 export type {
   ClassifiedDbError,
   QueryFailedClassifier,
