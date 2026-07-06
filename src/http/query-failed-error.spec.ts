@@ -92,4 +92,19 @@ describe('createQueryFailedNestErrorHandler', () => {
     expect(onUnhandledError).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
+
+  it('onUnhandledError が throw しても応答は変わらない', async () => {
+    const onUnhandledError = vi.fn(() => {
+      throw new Error('reporter crash');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { app } = buildApp(onUnhandledError);
+
+    const res = await app.request('/db-500');
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ statusCode: 500, message: 'db error' });
+    expect(onUnhandledError).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
 });
