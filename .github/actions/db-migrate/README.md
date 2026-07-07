@@ -41,7 +41,10 @@ RDS は本番のみが対象。dev は各自のローカル MySQL に `npm run d
 
 ```yaml
 jobs:
-  deployHono:
+  migrate:
+    concurrency:
+      group: db-migrate-${{ github.repository }}-odss # DB / secret-id ごとに一意
+      cancel-in-progress: false
     permissions:
       id-token: write
       contents: read
@@ -60,12 +63,34 @@ jobs:
           sg-id: <rds-sg-id>
           secret-id: <app>/mysql
           command: db:migrate
+  deploy:
+    needs: migrate
+    steps:
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
         working-directory: ./hono
 ```
 
 migrate が失敗すれば job が止まり、未マイグレーションの DB に新コードをデプロイしない。
+
+### concurrency（必須 — 並行 migrate 防止）
+
+composite action は **1 回の呼び出し内では** `npm run db:migrate` 完了まで待機するが、**workflow 同士の排他はしない**。
+連続 tag push や手動 migrate と release の同時実行で、同一 DB へ並行 `drizzle-kit migrate` が走ると
+`__drizzle_migrations` と実スキーマが desync しうる（記録だけ進んで DDL が欠ける等）。
+
+**呼び出し側 job に DB 単位の `concurrency` を必ず付ける**（`cancel-in-progress: false` でキュー待ち）:
+
+```yaml
+jobs:
+  migrate:
+    concurrency:
+      group: db-migrate-${{ github.repository }}-odss # secret-id / DB ごとに一意
+      cancel-in-progress: false
+```
+
+手動 `db-migrate.yml` も **同じ group 名**にする（例: `db-migrate-${{ github.repository }}-${{ inputs.target }}`）。
+複数 DB（odss-mobile の odss/futaba）なら migrate を **job 分割**し、各 job に対象 DB の group を付ける。
 
 ### 手動 DB オペレーション（初回 baseline / ad-hoc 再適用）
 
