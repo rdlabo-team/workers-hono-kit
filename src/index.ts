@@ -12,7 +12,10 @@
 
 // middleware
 export { finalizeResponse } from './middleware/finalize-response.js';
-export { validate, createValidate, createSentryValidate } from './middleware/validation.js';
+export { validate, createValidate } from './middleware/validation.js';
+// Backward-compat alias; prefer createValidate({ sentry }).
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional public re-export
+export { createSentryValidate } from './middleware/validation.js';
 export type {
   ValidateOptions,
   ValidationTarget,

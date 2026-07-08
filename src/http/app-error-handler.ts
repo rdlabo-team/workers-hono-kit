@@ -1,11 +1,8 @@
 import type { Context, Env } from 'hono';
-import {
-  classifyGenericMysqlDriverError,
-  createQueryFailedNestErrorHandler,
-  type QueryFailedClassifier,
-} from './query-failed-error.js';
 import type { ErrorReporter, NestErrorHandlerOptions, SentryExceptionReporterLike } from './nest-error.js';
 import { createSentryErrorReporter } from './nest-error.js';
+import type { QueryFailedClassifier } from './query-failed-error.js';
+import { classifyGenericMysqlDriverError, createQueryFailedNestErrorHandler } from './query-failed-error.js';
 
 /**
  * Options for {@link createAppErrorHandler}.
@@ -16,8 +13,10 @@ import { createSentryErrorReporter } from './nest-error.js';
  * Pass `sentry` for Sentry-backed apps; omit it (or pass `undefined`) when not used.
  * `getReportError` / `reportError` override `sentry` (tests, container injection, scheduled paths).
  */
-export interface CreateAppErrorHandlerOptions<E extends Env = Env>
-  extends Omit<NestErrorHandlerOptions<E>, 'onUnhandledError'> {
+export interface CreateAppErrorHandlerOptions<E extends Env = Env> extends Omit<
+  NestErrorHandlerOptions<E>,
+  'onUnhandledError'
+> {
   /** mysql2 driver error classifier. Defaults to {@link classifyGenericMysqlDriverError}. */
   classify?: QueryFailedClassifier;
   /** Optional Sentry client (`@sentry/cloudflare`). Omitted on repos without Sentry. */

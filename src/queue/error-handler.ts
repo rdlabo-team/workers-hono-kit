@@ -1,5 +1,5 @@
-import type { QueueMessageLike } from './consumer.js';
 import type { SentryExceptionReporterLike } from '../http/nest-error.js';
+import type { QueueMessageLike } from './consumer.js';
 
 /**
  * Options for {@link createQueueErrorHandler}.

@@ -34,9 +34,8 @@ describe('createAppErrorHandler', () => {
     const res = await app.request('/plain');
     expect(res.status).toBe(500);
     expect(captureException).toHaveBeenCalledOnce();
-    expect(captureException.mock.calls[0]?.[1]).toEqual(
-      expect.objectContaining({ tags: { request_id: expect.any(String) } }),
-    );
+    const captureContext = captureException.mock.calls[0]?.[1] as { tags?: { request_id?: string } } | undefined;
+    expect(captureContext?.tags?.request_id).toEqual(expect.any(String));
     vi.restoreAllMocks();
   });
 

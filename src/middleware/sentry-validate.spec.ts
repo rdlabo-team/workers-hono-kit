@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createSentryValidate } from './validation.js';
+import { createValidate } from './validation.js';
 import type { SentryLike } from './validation.js';
 
 function fakeSentry() {
@@ -22,10 +22,10 @@ function fakeSentry() {
 
 const schema = z.object({ name: z.string() });
 
-describe('createSentryValidate', () => {
+describe('createValidate({ sentry })', () => {
   it('検証成功時は Sentry に通報しない', async () => {
     const { sentry, captured } = fakeSentry();
-    const validate = createSentryValidate(sentry);
+    const validate = createValidate({ sentry });
     const app = new Hono().post('/', validate('json', schema), (c) => c.json({ ok: true }));
 
     const res = await app.request('/', {
@@ -39,7 +39,7 @@ describe('createSentryValidate', () => {
 
   it('検証失敗時は NestJS 同形 400 を返しつつ Sentry に dto_validation で通報する', async () => {
     const { sentry, tags, contexts, captured } = fakeSentry();
-    const validate = createSentryValidate(sentry);
+    const validate = createValidate({ sentry });
     const app = new Hono().post('/', validate('json', schema), (c) => c.json({ ok: true }));
 
     const res = await app.request('/', {
@@ -61,7 +61,7 @@ describe('createSentryValidate', () => {
       },
       captureException: vi.fn(),
     };
-    const validate = createSentryValidate(sentry);
+    const validate = createValidate({ sentry });
     const app = new Hono().post('/', validate('json', schema), (c) => c.json({ ok: true }));
 
     const res = await app.request('/', {

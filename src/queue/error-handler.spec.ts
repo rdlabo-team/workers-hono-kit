@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createQueueErrorHandler } from './error-handler.js';
 import type { QueueMessageLike } from './consumer.js';
+import { createQueueErrorHandler } from './error-handler.js';
 
 function fakeMessage(overrides: Partial<QueueMessageLike> = {}): QueueMessageLike {
   return {

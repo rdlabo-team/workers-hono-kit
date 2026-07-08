@@ -17,7 +17,6 @@ describe('classifyGenericMysqlDriverError', () => {
   });
 });
 
-
 describe('createQueryFailedNestErrorHandler', () => {
   const driverError = (errno: number, sqlMessage: string) => ({ errno, sqlMessage, sqlState: 'XXXXX', code: 'ERR' });
 

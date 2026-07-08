@@ -12,10 +12,7 @@ describe('createIsolateMemo', () => {
   });
 
   it('does not cache a rejected promise', async () => {
-    const loader = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('transient'))
-      .mockResolvedValueOnce('ok');
+    const loader = vi.fn().mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce('ok');
     const resolve = createIsolateMemo(loader);
 
     await expect(resolve('a')).rejects.toThrow('transient');
