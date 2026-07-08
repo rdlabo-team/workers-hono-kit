@@ -1,8 +1,8 @@
-import type { Env } from 'hono';
-import type { MiddlewareHandler } from 'hono';
+import type { Env, MiddlewareHandler } from 'hono';
 import type { Connection } from 'mysql2/promise';
+import { withMysqlConnections } from '../db/connection.js';
+import type { HyperdriveLike } from '../db/connection.js';
 import type { ExecutionContextLike } from '../http/execution-context.js';
-import { withMysqlConnections, type HyperdriveLike } from '../db/connection.js';
 
 /** Inputs available while building a per-request application container. */
 export interface ContainerBuildContext<TEnv extends Env['Bindings']> {
