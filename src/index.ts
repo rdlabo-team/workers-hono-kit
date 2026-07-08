@@ -12,7 +12,7 @@
 
 // middleware
 export { finalizeResponse } from './middleware/finalize-response.js';
-export { validate, createSentryValidate } from './middleware/validation.js';
+export { validate, createValidate, createSentryValidate } from './middleware/validation.js';
 export type {
   ValidateOptions,
   ValidationTarget,
@@ -42,14 +42,20 @@ export { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from
 export type { NestErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/nest-error.js';
 export { findMysqlDriverError, logMysqlDriverError } from './http/mysql-driver-error.js';
 export type { MysqlDriverErrorLike } from './http/mysql-driver-error.js';
-export { createQueryFailedNestErrorHandler, reportClassifiedDbError } from './http/query-failed-error.js';
+export { createQueryFailedNestErrorHandler, classifyGenericMysqlDriverError } from './http/query-failed-error.js';
 export type {
   ClassifiedDbError,
   QueryFailedClassifier,
   QueryFailedNestErrorHandlerOptions,
 } from './http/query-failed-error.js';
+export { createAppErrorHandler } from './http/app-error-handler.js';
+export type { CreateAppErrorHandlerOptions } from './http/app-error-handler.js';
 export { normalizeTrailingSlash } from './http/trailing-slash.js';
 export type { ExecutionContextLike } from './http/execution-context.js';
+export { defaultDefer, createWaitUntilDefer } from './http/defer.js';
+export type { DeferExecutor } from './http/defer.js';
+export { createSentryErrorReporter } from './http/nest-error.js';
+export type { SentryExceptionReporterLike } from './http/nest-error.js';
 
 // cache
 export { KVCache } from './cache/kv-cache.js';
@@ -67,6 +73,8 @@ export { sendInChunks } from './queue/send.js';
 export type { QueueLike, QueueSendMessage } from './queue/send.js';
 export { processBatch } from './queue/consumer.js';
 export type { QueueMessageLike, MessageBatchLike, ProcessBatchOptions, ProcessBatchResult } from './queue/consumer.js';
+export { createQueueErrorHandler } from './queue/error-handler.js';
+export type { CreateQueueErrorHandlerOptions } from './queue/error-handler.js';
 
 // ai
 export { createAiGatewayProvider } from './ai/gateway.js';

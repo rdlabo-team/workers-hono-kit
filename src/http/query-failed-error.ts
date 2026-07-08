@@ -1,5 +1,5 @@
 import type { Context, Env } from 'hono';
-import { logMysqlDriverError } from './mysql-driver-error.js';
+import { findMysqlDriverError, logMysqlDriverError } from './mysql-driver-error.js';
 import { createNestErrorHandler } from './nest-error.js';
 import type { ErrorReporter, NestErrorHandlerOptions } from './nest-error.js';
 
@@ -13,10 +13,20 @@ export interface ClassifiedDbError {
 export type QueryFailedClassifier = (err: unknown) => ClassifiedDbError | null;
 
 /**
- * 分類済み DB エラーをログし、500 のみ {@link ErrorReporter} へ通報する。
- * 400 はビジネスエラー扱い（warn ログのみ、Sentry 不要）。
+ * Default classifier for apps without a NestJS `QueryFailedExceptionFilter` parity layer.
+ * Maps any mysql2 driver error to generic 500 `{ statusCode, message: 'Internal server error' }`.
  */
-export function reportClassifiedDbError(
+export function classifyGenericMysqlDriverError(err: unknown): ClassifiedDbError | null {
+  if (!findMysqlDriverError(err)) {
+    return null;
+  }
+  return { statusCode: 500, message: 'Internal server error' };
+}
+
+/**
+ * @internal Used by {@link createQueryFailedNestErrorHandler} only.
+ */
+function reportClassifiedDbError(
   err: unknown,
   classified: ClassifiedDbError,
   reportError?: ErrorReporter,
@@ -51,7 +61,7 @@ export function createQueryFailedNestErrorHandler<E extends Env = Env>(options: 
   return (err: Error, c: Context<E>): Response => {
     const classified = classify(err);
     if (classified) {
-      logMysqlDriverError(err, classified.statusCode);
+      reportClassifiedDbError(err, classified);
       if (classified.statusCode === 500) {
         try {
           onUnhandledError?.(err, c);

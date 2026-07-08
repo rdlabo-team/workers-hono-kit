@@ -2,27 +2,21 @@ import { Hono } from 'hono';
 import { requestId } from 'hono/request-id';
 import { describe, expect, it, vi } from 'vitest';
 import type { ClassifiedDbError } from './query-failed-error.js';
-import { createQueryFailedNestErrorHandler, reportClassifiedDbError } from './query-failed-error.js';
+import { classifyGenericMysqlDriverError, createQueryFailedNestErrorHandler } from './query-failed-error.js';
 
-describe('reportClassifiedDbError', () => {
-  it('500 は reportError を呼ぶ', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const reportError = vi.fn();
-    const err = { errno: 1064, sqlMessage: 'syntax error', sqlState: '42000' };
-    reportClassifiedDbError(err, { statusCode: 500, message: 'db error' }, reportError, 'req-1');
-    expect(reportError).toHaveBeenCalledWith(err, { requestId: 'req-1' });
-    vi.restoreAllMocks();
+describe('classifyGenericMysqlDriverError', () => {
+  it('returns null for non-driver errors', () => {
+    expect(classifyGenericMysqlDriverError(new Error('boom'))).toBeNull();
   });
 
-  it('400 は reportError を呼ばない', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const reportError = vi.fn();
-    const err = { errno: 1062, sqlMessage: 'Duplicate entry', sqlState: '23000' };
-    reportClassifiedDbError(err, { statusCode: 400, message: 'dup' }, reportError, 'req-1');
-    expect(reportError).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
+  it('returns generic 500 for mysql driver errors', () => {
+    expect(classifyGenericMysqlDriverError({ errno: 1064, sqlMessage: 'syntax' })).toEqual({
+      statusCode: 500,
+      message: 'Internal server error',
+    });
   });
 });
+
 
 describe('createQueryFailedNestErrorHandler', () => {
   const driverError = (errno: number, sqlMessage: string) => ({ errno, sqlMessage, sqlState: 'XXXXX', code: 'ERR' });

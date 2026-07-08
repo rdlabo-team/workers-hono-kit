@@ -38,6 +38,28 @@ export interface ErrorReportContext {
 export type ErrorReporter = (error: unknown, context?: ErrorReportContext) => void;
 
 /**
+ * Minimal Sentry-like client for {@link createSentryErrorReporter} and {@link createQueueErrorHandler}.
+ *
+ * @remarks
+ * Declared structurally to avoid a hard dependency on `@sentry/cloudflare`.
+ */
+export interface SentryExceptionReporterLike {
+  captureException(
+    exception: unknown,
+    captureContext?: { tags?: Record<string, string>; extra?: Record<string, unknown> },
+  ): void;
+}
+
+/**
+ * Build an {@link ErrorReporter} that forwards unhandled errors to Sentry with an optional `request_id` tag.
+ */
+export function createSentryErrorReporter(sentry: SentryExceptionReporterLike): ErrorReporter {
+  return (error, context) => {
+    sentry.captureException(error, context?.requestId ? { tags: { request_id: context.requestId } } : undefined);
+  };
+}
+
+/**
  * Minimal shape read from a value treated as an HTTP error: its status, message, and optional body.
  *
  * @internal

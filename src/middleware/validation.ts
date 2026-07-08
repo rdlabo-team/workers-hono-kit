@@ -126,26 +126,16 @@ export interface SentryLike {
 }
 
 /**
- * Create a {@link validate}-like factory that additionally reports DTO validation 400s to Sentry.
+ * Create a bound {@link validate} factory with optional Sentry reporting on validation failures.
  *
- * The returned function has the same signature and behavior as {@link validate}; reporting is a pure
- * side effect that does not alter validation behavior or the response. Each report is tagged with
- * `error.type=dto_validation` and carries a `validation` context of `{ errorCount, errors }`.
- *
- * @param sentry - A Sentry-like client used to capture validation failures; see {@link SentryLike}.
- * @returns A function `(target, schema) => MiddlewareHandler` mirroring {@link validate}.
- *
- * @example
- * ```ts
- * import * as Sentry from '@sentry/cloudflare';
- * import { z } from 'zod';
- * import { createSentryValidate } from '@rdlabo/workers-hono-kit';
- *
- * const validate = createSentryValidate(Sentry);
- * app.post('/users', validate('json', z.object({ name: z.string() })), handler);
- * ```
+ * @param options.sentry - When set, 400 validation errors are reported (dto_validation tag + context).
+ * @returns `(target, schema[, validateOptions])` middleware — same as {@link validate} when sentry is omitted.
  */
-export function createSentryValidate(sentry: SentryLike) {
+export function createValidate(options?: { sentry?: SentryLike }) {
+  if (!options?.sentry) {
+    return validate;
+  }
+  const sentry = options.sentry;
   const onValidationError = (error: ZodErrorLike): void => {
     const messages = zodToMessages(error);
     sentry.withScope((scope) => {
@@ -154,5 +144,13 @@ export function createSentryValidate(sentry: SentryLike) {
       sentry.captureException(error);
     });
   };
-  return <T>(target: ValidationTarget, schema: ZodType<T>) => validate(target, schema, { onValidationError });
+  return <T>(target: ValidationTarget, schema: ZodType<T>, validateOptions?: ValidateOptions) =>
+    validate(target, schema, { ...validateOptions, onValidationError });
+}
+
+/**
+ * @deprecated Use {@link createValidate}({ sentry }) instead.
+ */
+export function createSentryValidate(sentry: SentryLike) {
+  return createValidate({ sentry });
 }
