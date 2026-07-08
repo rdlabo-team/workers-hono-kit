@@ -93,6 +93,8 @@ export type {
 export { getAuthenticationSecret } from './aws/secrets-manager.js';
 export type { AwsSecretsOptions } from './aws/secrets-manager.js';
 export { getCloudFrontSignedUrl } from './aws/cloudfront.js';
+export { getTemporaryCredentials } from './aws/sts.js';
+export type { GetTemporaryCredentialsOptions, StsCredentials } from './aws/sts.js';
 
 // firebase
 export type { DecodedIdToken, FirebaseVerifier } from './firebase/firebase-verifier.js';

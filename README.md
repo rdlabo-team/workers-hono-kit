@@ -5,7 +5,7 @@ Infrastructure toolkit for building APIs on [Hono](https://hono.dev) + [Cloudfla
 It provides the building blocks a NestJS-style API needs but that don't run on `workerd` (no Node.js AWS SDK, no `firebase-admin`), plus middleware that matches Express / NestJS response semantics byte-for-byte:
 
 - **Firebase ID-token verification** on Workers via [`jose`](https://github.com/panva/jose) (RS256 against Google's securetoken JWKS), with optional Identity Toolkit REST for `getUser` / `deleteUser`.
-- **AWS Secrets Manager** via SigV4-signed `fetch` ([`aws4fetch`](https://github.com/mhart/aws4fetch)) — no AWS SDK.
+- **AWS Secrets Manager / STS AssumeRole / CloudFront signed URLs** via SigV4-signed `fetch` ([`aws4fetch`](https://github.com/mhart/aws4fetch)) or Web Crypto — no AWS SDK.
 - **Middleware**: `finalizeResponse` (Express-compatible weak ETag + JSON charset), `validate` (NestJS `ValidationPipe`-shaped 400), and zod number-coercion helpers.
 - **Standard API errors**: `createHttpErrorHandler` / `notFoundHandler` / `HttpStatus`.
 - **Deadlock retry** (`ER_LOCK_DEADLOCK` exponential backoff) and an optional **MySQL data layer** (`@rdlabo/workers-hono-kit/db`) for Hyperdrive + Drizzle.
@@ -56,6 +56,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `createSentryValidate(sentry)` | **Deprecated** — use `createValidate({ sentry })`. |
 | `zNum` / `zNumWithDefault` / `zNumOptional` / `zNumNullable` | Number-coercion zod schemas (mirror class-transformer `@Transform`). |
 | `getAuthenticationSecret<T>(options, secretId)` / `AwsSecretsOptions` | Fetch a secret from AWS Secrets Manager (SigV4 `fetch`, per-isolate cache). |
+| `getTemporaryCredentials(options)` / `GetTemporaryCredentialsOptions` / `StsCredentials` | STS `AssumeRole` via SigV4 `fetch` (global `sts.amazonaws.com`); returns temporary credentials for browser S3 uploads. |
 | `getCloudFrontSignedUrl(url, privateKeyPem, keyPairId, dateLessThan)` | CloudFront signed URL (canned policy, RSA-SHA1, URL-safe base64) — Web Crypto reimpl of `@aws-sdk/cloudfront-signer`, byte-identical query order. |
 | `JoseFirebaseVerifier` / `FirebaseVerifier` / `DecodedIdToken` | Firebase ID-token verification (`verifyIdToken`, `getUser`, `deleteUser`). |
 | `createRemoteFirebaseVerifier(projectId)` | Convenience factory: production verifier with a cached remote JWKS (verification only). |
@@ -269,6 +270,20 @@ const secret = await getAuthenticationSecret<MySecret>(
   },
   'myapp/secret',
 );
+```
+
+### STS AssumeRole (browser S3 uploads)
+
+```ts
+import { getTemporaryCredentials } from '@rdlabo/workers-hono-kit';
+
+const credentials = await getTemporaryCredentials({
+  accessKeyId: env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+  roleArn: 'arn:aws:iam::123456789012:role/s3-put-app-only-role',
+  roleSessionName: `session-${userId}-${Date.now()}`,
+});
+// Return credentials to the browser; PutObject uses @aws-sdk/client-s3 with AccessKeyId / …
 ```
 
 ### Deadlock retry & HTTP helpers
