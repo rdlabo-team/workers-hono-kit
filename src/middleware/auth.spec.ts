@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { createNestErrorHandler } from '../http/nest-error.js';
+import { createHttpErrorHandler } from '../http/http-error.js';
 import { createAuthMiddleware } from './auth.js';
 import type { AuthMiddlewareOptions } from './auth.js';
 
@@ -33,7 +33,7 @@ const baseOptions: AuthMiddlewareOptions<TestEnv, Decoded, number> = {
 
 function appWith(options: AuthMiddlewareOptions<TestEnv, Decoded, number>) {
   const app = new Hono<TestEnv>();
-  app.onError(createNestErrorHandler());
+  app.onError(createHttpErrorHandler());
   app.use('/guarded', createAuthMiddleware(options));
   app.get('/guarded', (c) =>
     c.json({

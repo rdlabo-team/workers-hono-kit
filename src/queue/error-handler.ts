@@ -1,4 +1,4 @@
-import type { SentryExceptionReporterLike } from '../http/nest-error.js';
+import type { SentryExceptionReporterLike } from '../http/http-error.js';
 import type { QueueMessageLike } from './consumer.js';
 
 /**

@@ -41,15 +41,15 @@ export type { AppInfo } from './http/app-info.js';
 export { resolveAppEnv, isProductionEnv } from './http/app-env.js';
 export type { AppEnv } from './http/app-env.js';
 export { HttpStatus } from './http/http-status.js';
-export { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from './http/nest-error.js';
-export type { NestErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/nest-error.js';
+export { createHttpErrorHandler, notFoundHandler, HTTP_ERROR_PHRASES } from './http/http-error.js';
+export type { HttpErrorHandlerOptions, ErrorReportContext, ErrorReporter } from './http/http-error.js';
 export { findMysqlDriverError, logMysqlDriverError } from './http/mysql-driver-error.js';
 export type { MysqlDriverErrorLike } from './http/mysql-driver-error.js';
-export { createQueryFailedNestErrorHandler, classifyGenericMysqlDriverError } from './http/query-failed-error.js';
+export { createQueryFailedErrorHandler, classifyGenericMysqlDriverError } from './http/query-failed-error.js';
 export type {
   ClassifiedDbError,
   QueryFailedClassifier,
-  QueryFailedNestErrorHandlerOptions,
+  QueryFailedErrorHandlerOptions,
 } from './http/query-failed-error.js';
 export { createAppErrorHandler } from './http/app-error-handler.js';
 export type { CreateAppErrorHandlerOptions } from './http/app-error-handler.js';
@@ -57,8 +57,8 @@ export { normalizeTrailingSlash } from './http/trailing-slash.js';
 export type { ExecutionContextLike } from './http/execution-context.js';
 export { defaultDefer, createWaitUntilDefer } from './http/defer.js';
 export type { DeferExecutor } from './http/defer.js';
-export { createSentryErrorReporter } from './http/nest-error.js';
-export type { SentryExceptionReporterLike } from './http/nest-error.js';
+export { createSentryErrorReporter } from './http/http-error.js';
+export type { SentryExceptionReporterLike } from './http/http-error.js';
 
 // cache
 export { KVCache } from './cache/kv-cache.js';

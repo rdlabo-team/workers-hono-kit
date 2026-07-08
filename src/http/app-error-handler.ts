@@ -1,20 +1,19 @@
 import type { Context, Env } from 'hono';
-import type { ErrorReporter, NestErrorHandlerOptions, SentryExceptionReporterLike } from './nest-error.js';
-import { createSentryErrorReporter } from './nest-error.js';
+import type { ErrorReporter, HttpErrorHandlerOptions, SentryExceptionReporterLike } from './http-error.js';
+import { createSentryErrorReporter } from './http-error.js';
 import type { QueryFailedClassifier } from './query-failed-error.js';
-import { classifyGenericMysqlDriverError, createQueryFailedNestErrorHandler } from './query-failed-error.js';
+import { classifyGenericMysqlDriverError, createQueryFailedErrorHandler } from './query-failed-error.js';
 
 /**
  * Options for {@link createAppErrorHandler}.
  *
  * @remarks
- * Wires `createQueryFailedNestErrorHandler` with fleet defaults (`fieldOrder: 'message-first'`,
- * {@link classifyGenericMysqlDriverError}) and optional error reporting.
+ * Wires `createQueryFailedErrorHandler` with fleet defaults ({@link classifyGenericMysqlDriverError}) and optional error reporting.
  * Pass `sentry` for Sentry-backed apps; omit it (or pass `undefined`) when not used.
  * `getReportError` / `reportError` override `sentry` (tests, container injection, scheduled paths).
  */
 export interface CreateAppErrorHandlerOptions<E extends Env = Env> extends Omit<
-  NestErrorHandlerOptions<E>,
+  HttpErrorHandlerOptions<E>,
   'onUnhandledError'
 > {
   /** mysql2 driver error classifier. Defaults to {@link classifyGenericMysqlDriverError}. */
@@ -30,7 +29,7 @@ export interface CreateAppErrorHandlerOptions<E extends Env = Env> extends Omit<
 }
 
 /**
- * Standard `app.onError` factory: QueryFailed filter → Nest default filter, with optional error reporting.
+ * Standard `app.onError` factory: QueryFailed filter → HTTP error handler, with optional error reporting.
  */
 export function createAppErrorHandler<E extends Env = Env>(options: CreateAppErrorHandlerOptions<E> = {}) {
   const {
@@ -39,8 +38,7 @@ export function createAppErrorHandler<E extends Env = Env>(options: CreateAppErr
     reportError,
     getReportError,
     onUnhandledError,
-    fieldOrder = 'message-first',
-    ...nestOptions
+    ...httpOptions
   } = options;
 
   const sentryReporter = sentry ? createSentryErrorReporter(sentry) : undefined;
@@ -53,9 +51,8 @@ export function createAppErrorHandler<E extends Env = Env>(options: CreateAppErr
       reporter?.(err, { requestId });
     });
 
-  return createQueryFailedNestErrorHandler<E>({
-    fieldOrder,
-    ...nestOptions,
+  return createQueryFailedErrorHandler<E>({
+    ...httpOptions,
     classify,
     onUnhandledError: resolvedOnUnhandled,
   });

@@ -2,13 +2,13 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { describe, expect, it, vi } from 'vitest';
-import { createNestErrorHandler, nestNotFoundHandler, NEST_REASON_PHRASES } from './nest-error.js';
-import type { NestErrorHandlerOptions } from './nest-error.js';
+import { createHttpErrorHandler, notFoundHandler } from './http-error.js';
+import type { HttpErrorHandlerOptions } from './http-error.js';
 
-function buildApp(options?: NestErrorHandlerOptions) {
+function buildApp(options?: HttpErrorHandlerOptions) {
   const app = new Hono();
-  app.onError(createNestErrorHandler(options));
-  app.notFound(nestNotFoundHandler);
+  app.onError(createHttpErrorHandler(options));
+  app.notFound(notFoundHandler);
   app.get('/forbidden', () => {
     throw new HTTPException(403, { message: 'Forbidden resource' });
   });
@@ -24,15 +24,18 @@ function buildApp(options?: NestErrorHandlerOptions) {
   return app;
 }
 
-describe('createNestErrorHandler', () => {
-  it('既定: 非 bare の HTTPException を statusCode-first の Nest body にマップする', async () => {
+describe('createHttpErrorHandler', () => {
+  it('非 bare の HTTPException を標準 error body にマップする', async () => {
     const res = await buildApp().request('/forbidden');
     expect(res.status).toBe(403);
-    // フィールド順序まで固定（byte-parity）。
-    expect(await res.text()).toBe('{"statusCode":403,"message":"Forbidden resource","error":"Forbidden"}');
+    expect(await res.json()).toEqual({
+      statusCode: 403,
+      message: 'Forbidden resource',
+      error: 'Forbidden',
+    });
   });
 
-  it('401（bareStatuses 既定）は error フィールドを持たない', async () => {
+  it('401 は error フィールドを持たない', async () => {
     const res = await buildApp().request('/unauthorized');
     expect(res.status).toBe(401);
     expect(await res.text()).toBe('{"statusCode":401,"message":"Unauthorized"}');
@@ -62,11 +65,6 @@ describe('createNestErrorHandler', () => {
     expect(await res.json()).toEqual({ statusCode: 500, message: 'Internal server error' });
   });
 
-  it("fieldOrder:'message-first' は foodlabel の { message, error, statusCode } を維持する", async () => {
-    const res = await buildApp({ fieldOrder: 'message-first' }).request('/forbidden');
-    expect(await res.text()).toBe('{"message":"Forbidden resource","error":"Forbidden","statusCode":403}');
-  });
-
   it('カスタム isHttpError と body 脱出口（winecode HttpError 相当）を verbatim で返す', async () => {
     class HttpError extends Error {
       constructor(
@@ -78,7 +76,7 @@ describe('createNestErrorHandler', () => {
       }
     }
     const app = new Hono();
-    app.onError(createNestErrorHandler({ isHttpError: (e): e is HttpError => e instanceof HttpError }));
+    app.onError(createHttpErrorHandler({ isHttpError: (e): e is HttpError => e instanceof HttpError }));
     app.get('/forbidden', () => {
       throw new HttpError(403, 'Forbidden resource');
     });
@@ -94,48 +92,10 @@ describe('createNestErrorHandler', () => {
     expect(verbatim.status).toBe(401);
     expect(await verbatim.json()).toEqual({ message: 'Unauthorized', statusCode: 401 });
   });
-
-  it('reasonPhrases を上書きできる', async () => {
-    const res = await buildApp({ reasonPhrases: { ...NEST_REASON_PHRASES, 403: 'Nope' } }).request('/forbidden');
-    expect(await res.json()).toEqual({ statusCode: 403, message: 'Forbidden resource', error: 'Nope' });
-  });
-
-  it('bareStatuses に追加した status は error フィールドを落とす', async () => {
-    const res = await buildApp({ bareStatuses: [401, 403] }).request('/forbidden');
-    expect(await res.json()).toEqual({ statusCode: 403, message: 'Forbidden resource' });
-  });
-
-  it('internalServerErrorBody を上書きできる', async () => {
-    const res = await buildApp({ internalServerErrorBody: { statusCode: 500, message: 'oops' } }).request('/boom');
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ statusCode: 500, message: 'oops' });
-  });
-
-  it('fallbackReason + bareStatuses:[] で全 status に error を付ける（winecode 形）', async () => {
-    const app = buildApp({ bareStatuses: [], fallbackReason: 'Error' });
-    // reasonPhrase 有り（403）
-    expect(await (await app.request('/forbidden')).json()).toEqual({
-      statusCode: 403,
-      message: 'Forbidden resource',
-      error: 'Forbidden',
-    });
-    // reasonPhrase 無し（418）→ fallback 'Error'
-    expect(await (await app.request('/teapot')).json()).toEqual({
-      statusCode: 418,
-      message: "I'm a teapot",
-      error: 'Error',
-    });
-    // bareStatuses:[] なので 401 も error を持つ
-    expect(await (await app.request('/unauthorized')).json()).toEqual({
-      statusCode: 401,
-      message: 'Unauthorized',
-      error: 'Unauthorized',
-    });
-  });
 });
 
-describe('nestNotFoundHandler', () => {
-  it('Express/Nest 既定の 404 body（Cannot METHOD path）を返す', async () => {
+describe('notFoundHandler', () => {
+  it('既定の 404 body（Cannot METHOD path）を返す', async () => {
     const res = await buildApp().request('/does/not/exist');
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({

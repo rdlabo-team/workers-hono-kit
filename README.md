@@ -7,7 +7,7 @@ It provides the building blocks a NestJS-style API needs but that don't run on `
 - **Firebase ID-token verification** on Workers via [`jose`](https://github.com/panva/jose) (RS256 against Google's securetoken JWKS), with optional Identity Toolkit REST for `getUser` / `deleteUser`.
 - **AWS Secrets Manager** via SigV4-signed `fetch` ([`aws4fetch`](https://github.com/mhart/aws4fetch)) — no AWS SDK.
 - **Middleware**: `finalizeResponse` (Express-compatible weak ETag + JSON charset), `validate` (NestJS `ValidationPipe`-shaped 400), and zod number-coercion helpers.
-- **NestJS-shaped errors**: `createNestErrorHandler` / `nestNotFoundHandler` / `HttpStatus`.
+- **Standard API errors**: `createHttpErrorHandler` / `notFoundHandler` / `HttpStatus`.
 - **Deadlock retry** (`ER_LOCK_DEADLOCK` exponential backoff) and an optional **MySQL data layer** (`@rdlabo/workers-hono-kit/db`) for Hyperdrive + Drizzle.
 - **AI Gateway**: route `@ai-sdk` models through the Cloudflare AI Gateway.
 - **Stripe** Workers-native client + async webhook verification.
@@ -66,17 +66,17 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `getAppInfo(c)` / `AppInfo` | Read `x-amz-meta-version` / `x-amz-meta-uuid`. |
 | `resolveAppEnv(env)` / `isProductionEnv(env)` / `AppEnv` | Resolve `'development'` / `'production'` from `env.APP_ENV` (defaults to `'production'` for safety). |
 | `HttpStatus` | HTTP status enum identical to NestJS `@nestjs/common`. |
-| `createNestErrorHandler(options?)` / `NestErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to the NestJS exception-filter body (`{ statusCode, message, error? }`; `401` omits `error`). Configurable field order, reason phrases, error predicate, and unhandled-error report hook. Unhandled errors log via `console.error` (mysql2 errors include `sqlMessage` / `errno` when detectable). |
-| `createAppErrorHandler(options?)` / `CreateAppErrorHandlerOptions` | Standard `app.onError`: {@link createQueryFailedNestErrorHandler} + default {@link classifyGenericMysqlDriverError} + optional `sentry` (Sentry apps), `getReportError` / `reportError` (tests / container), or neither (no external reporting). |
-| `createQueryFailedNestErrorHandler(options)` / `QueryFailedClassifier` / `ClassifiedDbError` | Lower-level compose when you need full control over `classify` + `onUnhandledError` without defaults. |
-| `classifyGenericMysqlDriverError(err)` | Default classifier for apps without Nest filter parity: any mysql2 driver error → `{ statusCode: 500, message: 'Internal server error' }`; non-DB errors → `null`. |
-| `findMysqlDriverError(err)` / `logMysqlDriverError(err, statusCode)` | Low-level mysql2 driver-error detection (follows `err.cause`) and structured logging. For custom classifiers (e.g. odss parity). |
-| `nestNotFoundHandler(c)` | `app.notFound()` handler with the Express/Nest default `{ message: 'Cannot METHOD path', error, statusCode }` 404 body. |
+| `createHttpErrorHandler(options?)` / `HttpErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to `{ statusCode, message, error? }` (`401` omits `error`). Optional custom error predicate and unhandled-error report hook. Unhandled errors log via `console.error` (mysql2 errors include `sqlMessage` / `errno` when detectable). |
+| `createAppErrorHandler(options?)` / `CreateAppErrorHandlerOptions` | Standard `app.onError`: {@link createQueryFailedErrorHandler} + default {@link classifyGenericMysqlDriverError} + optional `sentry` (Sentry apps), `getReportError` / `reportError` (tests / container), or neither (no external reporting). |
+| `createQueryFailedErrorHandler(options)` / `QueryFailedClassifier` / `ClassifiedDbError` | Lower-level compose when you need full control over `classify` + `onUnhandledError` without defaults. |
+| `classifyGenericMysqlDriverError(err)` | Default classifier: any mysql2 driver error → `{ statusCode: 500, message: 'Internal server error' }`; non-DB errors → `null`. |
+| `findMysqlDriverError(err)` / `logMysqlDriverError(err, statusCode)` | Low-level mysql2 driver-error detection (follows `err.cause`) and structured logging. For custom classifiers (e.g. odss). |
+| `notFoundHandler(c)` | `app.notFound()` handler with `{ message: 'Cannot METHOD path', error, statusCode }` 404 body. |
 | `normalizeTrailingSlash(request)` | Strip trailing slash(es) from the request URL before routing (Express/Nest parity). Does **not** 301-redirect — preserves POST/PUT/DELETE bodies. |
-| `NEST_REASON_PHRASES` | `{ 400, 401, 403, 404 }` → NestJS reason phrases. |
+| `HTTP_ERROR_PHRASES` | `{ 400, 401, 403, 404 }` → standard `error` field phrases. |
 | `createAuthMiddleware(options)` / `AuthMiddlewareOptions` | Factory for a Firebase-token auth middleware: reads the token header, verifies, resolves the DB user id, and stashes the result on the context. Omit `resolveUserId` for a token-only (login) guard. |
 | `perfLog(options?)` / `PerfLogOptions` / `AnalyticsEngineDatasetLike` | Middleware that records one per-request latency data point (`t_app`, colo, cold/warm, route, status) and emits it to **Workers Logs** (`console.log`) and/or **Workers Analytics Engine** (`writeDataPoint`). Lets you measure low-traffic Workers without a live `wrangler tail`. |
-| `ErrorReporter` / `ErrorReportContext` | Types for a `reportError`-style unhandled-error reporter (e.g. wired to Sentry), paired with `createNestErrorHandler`'s `onUnhandledError`. |
+| `ErrorReporter` / `ErrorReportContext` | Types for a `reportError`-style unhandled-error reporter (e.g. wired to Sentry), paired with `createHttpErrorHandler`'s `onUnhandledError`. |
 | `createSentryErrorReporter(sentry)` / `SentryExceptionReporterLike` | Build an `ErrorReporter` that forwards to Sentry with an optional `request_id` tag (no hard `@sentry/cloudflare` dependency). |
 | `DeferExecutor` / `defaultDefer` / `createWaitUntilDefer(ctx)` | Fire-and-forget executor for Workers: `defaultDefer` swallows rejections (tests); `createWaitUntilDefer` registers work via `ctx.waitUntil`. |
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
@@ -283,12 +283,10 @@ const appInfo = getAppInfo(c);
 return c.json(body, HttpStatus.CREATED);
 ```
 
-### NestJS-shaped error / 404 handlers
+### HTTP error / 404 handlers
 
-`createNestErrorHandler()` renders a thrown `HTTPException` as the NestJS exception-filter
-body, and `nestNotFoundHandler` gives the Express/Nest default 404. The defaults match the
-NestJS canonical shape (`{ statusCode, message, error? }`, `401` omits `error`); the options
-let you reproduce any byte-for-byte variation an existing API expects.
+`createHttpErrorHandler()` renders a thrown `HTTPException` as standard API error JSON,
+and `notFoundHandler` gives the default unmatched-route 404 body.
 
 #### App entry (fleet standard)
 
@@ -314,7 +312,7 @@ app.onError(
 );
 
 // odss-mobile: add classify: classifyQueryFailed (repo parity)
-// winecode: sentry + isHttpError / reasonPhrases in errors.ts (no container middleware)
+// winecode: sentry + isHttpError in errors.ts (no container middleware)
 // foodlabel: sentry + reportError: container.reportError (per-request container closure)
 ```
 
@@ -341,19 +339,19 @@ const { middleware: containerMiddleware, withContainer } = createContainerRuntim
 Use `withContainer` from `scheduled` / `queue` handlers; use `containerMiddleware` in `createApp`.
 
 ```ts
-import { createNestErrorHandler, nestNotFoundHandler } from '@rdlabo/workers-hono-kit';
+import { createHttpErrorHandler, notFoundHandler } from '@rdlabo/workers-hono-kit';
 
-app.notFound(nestNotFoundHandler);
+app.notFound(notFoundHandler);
 
 // Prefer createAppErrorHandler (see "App entry" above). Lower-level only when needed:
-app.onError(createNestErrorHandler());
+app.onError(createHttpErrorHandler());
 ```
 
 **Important:** `Sentry.withSentry` does **not** capture errors handled by `app.onError`. Pass `sentry`
 to `createAppErrorHandler` (or wire `getReportError` / `reportError` for tests and scheduled paths).
 
-Repos with a Nest `QueryFailedExceptionFilter` parity layer (e.g. odss-mobile) pass `classify` to
-`createAppErrorHandler` — do not call `createQueryFailedNestErrorHandler` directly unless you need full control.
+Repos with a custom DB error classifier (e.g. odss-mobile) pass `classify` to
+`createAppErrorHandler` — do not call `createQueryFailedErrorHandler` directly unless you need full control.
 
 ### Auth middleware
 

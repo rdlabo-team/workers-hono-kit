@@ -1,9 +1,9 @@
 import type { Context, Env } from 'hono';
+import type { ErrorReporter, HttpErrorHandlerOptions } from './http-error.js';
+import { createHttpErrorHandler } from './http-error.js';
 import { findMysqlDriverError, logMysqlDriverError } from './mysql-driver-error.js';
-import { createNestErrorHandler } from './nest-error.js';
-import type { ErrorReporter, NestErrorHandlerOptions } from './nest-error.js';
 
-/** Nest QueryFailedExceptionFilter が返す `{ statusCode, message }` 形（error フィールド無し）。 */
+/** DB エラー分類結果: `{ statusCode, message }` 形（error フィールド無し）。 */
 export interface ClassifiedDbError {
   statusCode: 400 | 500;
   message: string;
@@ -13,8 +13,7 @@ export interface ClassifiedDbError {
 export type QueryFailedClassifier = (err: unknown) => ClassifiedDbError | null;
 
 /**
- * Default classifier for apps without a NestJS `QueryFailedExceptionFilter` parity layer.
- * Maps any mysql2 driver error to generic 500 `{ statusCode, message: 'Internal server error' }`.
+ * Default classifier: any mysql2 driver error → generic 500 `{ statusCode, message: 'Internal server error' }`.
  */
 export function classifyGenericMysqlDriverError(err: unknown): ClassifiedDbError | null {
   if (!findMysqlDriverError(err)) {
@@ -24,7 +23,7 @@ export function classifyGenericMysqlDriverError(err: unknown): ClassifiedDbError
 }
 
 /**
- * @internal Used by {@link createQueryFailedNestErrorHandler} only.
+ * @internal Used by {@link createQueryFailedErrorHandler} only.
  */
 function reportClassifiedDbError(
   err: unknown,
@@ -38,25 +37,25 @@ function reportClassifiedDbError(
   }
 }
 
-export interface QueryFailedNestErrorHandlerOptions<E extends Env = Env> extends NestErrorHandlerOptions<E> {
-  /** アプリ固有の分類（parity-critical な日本語メッセージ等は consumer 側で定義）。 */
+export interface QueryFailedErrorHandlerOptions<E extends Env = Env> extends HttpErrorHandlerOptions<E> {
+  /** アプリ固有の分類（日本語メッセージ等は consumer 側で定義）。 */
   classify: QueryFailedClassifier;
 }
 
 /**
- * QueryFailedExceptionFilter → Nest 既定 exception filter の合成 onError。
+ * DB エラー分類 → 標準 HTTP エラーハンドラの合成 onError。
  *
  * @remarks
- * classify が non-null のときは parity 用 body を返しつつログ（+ 500 は onUnhandledError）を残す。
- * 非 DB エラーは {@link createNestErrorHandler} に委譲する。
+ * classify が non-null のときは分類結果の body を返しつつログ（+ 500 は onUnhandledError）を残す。
+ * 非 DB エラーは {@link createHttpErrorHandler} に委譲する。
  *
  * `Sentry.withSentry` だけでは onError 握りエラーは capture されないため、
  * `onUnhandledError: (err, c) => container.reportError?.(err, { requestId: c.get('requestId') })` を必ず配線する。
  */
-export function createQueryFailedNestErrorHandler<E extends Env = Env>(options: QueryFailedNestErrorHandlerOptions<E>) {
-  const { classify, ...nestOptions } = options;
-  const nestErrorHandler = createNestErrorHandler(nestOptions);
-  const { onUnhandledError } = nestOptions;
+export function createQueryFailedErrorHandler<E extends Env = Env>(options: QueryFailedErrorHandlerOptions<E>) {
+  const { classify, ...httpOptions } = options;
+  const httpErrorHandler = createHttpErrorHandler(httpOptions);
+  const { onUnhandledError } = httpOptions;
 
   return (err: Error, c: Context<E>): Response => {
     const classified = classify(err);
@@ -71,6 +70,6 @@ export function createQueryFailedNestErrorHandler<E extends Env = Env>(options: 
       }
       return c.json({ statusCode: classified.statusCode, message: classified.message }, classified.statusCode);
     }
-    return nestErrorHandler(err, c);
+    return httpErrorHandler(err, c);
   };
 }

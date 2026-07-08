@@ -31,7 +31,7 @@ This package is used by the `hono/` directory of these projects:
 ```
 hono/
   src/
-    app.ts          → finalizeResponse(), createNestErrorHandler(), nestNotFoundHandler()
+    app.ts          → finalizeResponse(), createAppErrorHandler(), notFoundHandler()
     worker.ts       → createServiceAccountVerifier(), withMysqlConnections()
     container.ts    → KVCache, isProductionEnv()
     middleware/

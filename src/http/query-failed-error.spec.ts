@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { requestId } from 'hono/request-id';
 import { describe, expect, it, vi } from 'vitest';
 import type { ClassifiedDbError } from './query-failed-error.js';
-import { classifyGenericMysqlDriverError, createQueryFailedNestErrorHandler } from './query-failed-error.js';
+import { classifyGenericMysqlDriverError, createQueryFailedErrorHandler } from './query-failed-error.js';
 
 describe('classifyGenericMysqlDriverError', () => {
   it('returns null for non-driver errors', () => {
@@ -17,7 +17,7 @@ describe('classifyGenericMysqlDriverError', () => {
   });
 });
 
-describe('createQueryFailedNestErrorHandler', () => {
+describe('createQueryFailedErrorHandler', () => {
   const driverError = (errno: number, sqlMessage: string) => ({ errno, sqlMessage, sqlState: 'XXXXX', code: 'ERR' });
 
   const classify = (err: unknown): ClassifiedDbError | null => {
@@ -44,7 +44,7 @@ describe('createQueryFailedNestErrorHandler', () => {
     app.get('/plain', () => {
       throw new Error('boom');
     });
-    app.onError(createQueryFailedNestErrorHandler({ classify, onUnhandledError }));
+    app.onError(createQueryFailedErrorHandler({ classify, onUnhandledError }));
     return { app, onUnhandledError };
   }
 
@@ -73,7 +73,7 @@ describe('createQueryFailedNestErrorHandler', () => {
     vi.restoreAllMocks();
   });
 
-  it('非 DB エラーは nestErrorHandler に委譲する', async () => {
+  it('非 DB エラーは httpErrorHandler に委譲する', async () => {
     const onUnhandledError = vi.fn();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { app } = buildApp(onUnhandledError);
