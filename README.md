@@ -284,17 +284,60 @@ body, and `nestNotFoundHandler` gives the Express/Nest default 404. The defaults
 NestJS canonical shape (`{ statusCode, message, error? }`, `401` omits `error`); the options
 let you reproduce any byte-for-byte variation an existing API expects.
 
+#### App entry (fleet standard)
+
+Use a **singleton** Hono app and inject the request-scoped container in middleware — do **not**
+call `createApp(container).fetch(...)` on every request (rebuilds the route graph each time).
+
+```ts
+// worker.ts — once per isolate
+const app = createApp();
+export default Sentry.withSentry(/* … */, {
+  fetch: (req, env, ctx) => app.fetch(req, env, ctx),
+});
+
+// app.ts — container middleware sets c.set('container', …) with reportError from worker
+app.onError(
+  createQueryFailedNestErrorHandler({
+    classify: classifyQueryFailed,
+    onUnhandledError: (err, c) => c.get('container')?.reportError?.(err, { requestId: c.get('requestId') }),
+  }),
+);
+```
+
+Reference: `winecode/hono` (singleton + container middleware). Legacy repos still using
+per-request `createApp(container)` should migrate to this shape.
+
+**Isolate-scoped memo + container runtime** (shared across the fleet):
+
+```ts
+import { createContainerRuntime, createIsolateMemo } from '@rdlabo/workers-hono-kit';
+
+// Secrets / env: cache successes per isolate; rejections are NOT cached (retry on next request).
+const resolveSecrets = createIsolateMemo(async (env: Env) => { /* SM or env vars */ });
+
+const { middleware: containerMiddleware, withContainer } = createContainerRuntime<Env, Container>({
+  hyperdrives: (env) => ({ primary: env.HYPERDRIVE_PRIMARY, replica: env.HYPERDRIVE_REPLICA }),
+  createContainer: async ({ env, executionCtx, primary, replica }) => {
+    const secret = await resolveSecrets(env);
+    return buildContainer({ /* db from primary/replica, secret, … */ });
+  },
+});
+```
+
+Use `withContainer` from `scheduled` / `queue` handlers; use `containerMiddleware` in `createApp`.
+
 ```ts
 import { createNestErrorHandler, nestNotFoundHandler } from '@rdlabo/workers-hono-kit';
 
 app.notFound(nestNotFoundHandler);
 app.onError(createNestErrorHandler());
 
-// Application-specific parity deltas:
+// Application-specific parity deltas (prefer c.get('container') in onUnhandledError — see above):
 app.onError(
   createNestErrorHandler({
     fieldOrder: 'message-first', // emit { message, error, statusCode } instead of statusCode-first
-    onUnhandledError: (err, c) => container.reportError?.(err, { requestId: c.get('requestId') }),
+    onUnhandledError: (err, c) => c.get('container')?.reportError?.(err, { requestId: c.get('requestId') }),
     isHttpError: (e): e is HttpError => e instanceof HttpError, // a custom error class with a `.body` escape hatch
   }),
 );
@@ -309,11 +352,12 @@ Repos with a Nest `QueryFailedExceptionFilter` (e.g. odss-mobile) should use
 ```ts
 import { createQueryFailedNestErrorHandler } from '@rdlabo/workers-hono-kit';
 
+// Prefer singleton app + c.get('container') — see "App entry (fleet standard)" above.
 app.onError(
   createQueryFailedNestErrorHandler({
     fieldOrder: 'message-first',
     classify: classifyQueryFailed, // app-local parity (Japanese messages, errno rules)
-    onUnhandledError: (err, c) => container.reportError?.(err, { requestId: c.get('requestId') }),
+    onUnhandledError: (err, c) => c.get('container')?.reportError?.(err, { requestId: c.get('requestId') }),
   }),
 );
 ```
@@ -364,7 +408,8 @@ import { perfLog } from '@rdlabo/workers-hono-kit';
 //    dataset binding) and `PERF_LOG === '1'` (Workers Logs) off `c.env`.
 app.use('*', perfLog());
 
-// B) app built without Hono env (`createApp(container).fetch(req)`): pass bindings explicitly.
+// B) bindings not on Hono env (legacy per-request createApp): pass explicitly — prefer fleet
+//    standard singleton app + container middleware so env is always on `c.env`.
 app.use('*', perfLog({ console: env.PERF_LOG === '1', dataset: env.PERF }));
 ```
 
@@ -386,7 +431,7 @@ GROUP BY path, colo ORDER BY p90 DESC
 ```
 
 > **Scope of `t_app`**: it covers everything *inside* the app; work done in `fetch` *before* the app
-> (e.g. secrets fetch / DB connect in `createApp(container)` vs. building the container in `fetch`) is
+> (e.g. secrets fetch / DB connect in container middleware vs. building the container in `worker.fetch`) is
 > not comparable across differently-wired apps. Instrument the `fetch` seam if you need a secrets/connect
 > cold breakdown. On production Workers `Date.now()` only advances at I/O boundaries, so `t_app` ≈ I/O
 > wait, not CPU time.

@@ -25,6 +25,10 @@ export { createAuthMiddleware } from './middleware/auth.js';
 export type { AuthMiddlewareOptions } from './middleware/auth.js';
 export { perfLog } from './middleware/perf-log.js';
 export type { PerfLogOptions, AnalyticsEngineDatasetLike } from './middleware/perf-log.js';
+export { createIsolateMemo } from './container/isolate-memo.js';
+export type { IsolateMemo } from './container/isolate-memo.js';
+export { createContainerRuntime } from './container/middleware.js';
+export type { ContainerBuildContext, ContainerRuntime, ContainerRuntimeOptions } from './container/middleware.js';
 
 // http
 export { getUserProtocol } from './http/user-protocol.js';
