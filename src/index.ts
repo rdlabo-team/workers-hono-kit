@@ -67,6 +67,20 @@ export type { KVNamespace, KVCacheOptions } from './cache/kv-cache.js';
 // stripe
 export { createStripeClient, verifyStripeWebhook } from './stripe/client.js';
 export type { CreateStripeClientOptions } from './stripe/client.js';
+export {
+  extractStripeFailureReason,
+  stripeFailureMessageJa,
+  serializePaymentFailure,
+  parsePaymentFailure,
+  PaymentDeclinedError,
+  toPaymentDeclinedError,
+} from './stripe/failure.js';
+export type {
+  StripeFailureReason,
+  PaymentFailureSource,
+  PaymentFailureRecord,
+  PaymentDeclinedBody,
+} from './stripe/failure.js';
 
 // db
 export { retryWhenDeadlock } from './db/retry.js';
