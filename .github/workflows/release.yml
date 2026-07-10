@@ -23,8 +23,9 @@ jobs:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Update npm
-        run: npm install -g npm@latest
+      # Node 22 同梱の npm（provenance/sigstore 対応）を使う。
+      # 以前の `npm install -g npm@latest` は latest npm の sigstore 解決バグ
+      # （MODULE_NOT_FOUND: sigstore）で publish が落ちたため撤去。
 
       - name: Extract version from tag
         id: tag_version
