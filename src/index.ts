@@ -71,6 +71,7 @@ export {
   extractStripeFailureReason,
   stripeFailureMessageJa,
   serializePaymentFailure,
+  serializeIapFailureReason,
   parsePaymentFailure,
   PaymentDeclinedError,
   toPaymentDeclinedError,

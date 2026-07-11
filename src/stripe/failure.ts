@@ -232,6 +232,11 @@ export function serializePaymentFailure(record: PaymentFailureRecord): string {
   return JSON.stringify(record);
 }
 
+/** Serialize an IAP reason directly, without redundant provider/source/timestamp wrappers. */
+export function serializeIapFailureReason(reason: IapFailureReason): string {
+  return JSON.stringify(reason);
+}
+
 /**
  * Parse a `payment_failed.receipt` value back into a {@link PaymentFailureRecord}.
  *
@@ -245,15 +250,23 @@ export function parsePaymentFailure(receipt: string | null | undefined): Payment
   try {
     const parsed = JSON.parse(receipt) as unknown;
     const r = asRecord(parsed);
-    if (
-      !r ||
-      !asRecord(r.reason) ||
-      (r.source !== undefined && typeof r.source !== 'string') ||
-      (r.occurredAt !== undefined && typeof r.occurredAt !== 'string')
-    ) {
+    if (!r) {
       return null;
     }
-    return parsed as PaymentFailureRecord;
+    if (asRecord(r.reason)) {
+      if (
+        (r.source !== undefined && typeof r.source !== 'string') ||
+        (r.occurredAt !== undefined && typeof r.occurredAt !== 'string')
+      ) {
+        return null;
+      }
+      return parsed as PaymentFailureRecord;
+    }
+    // IAP rows store the reason itself. `code` is required so arbitrary JSON is not accepted as a reason.
+    if (typeof r.code === 'string') {
+      return { reason: parsed as IapFailureReason };
+    }
+    return null;
   } catch {
     return null;
   }

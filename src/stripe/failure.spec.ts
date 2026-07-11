@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractStripeFailureReason,
   parsePaymentFailure,
+  serializeIapFailureReason,
   PaymentDeclinedError,
   serializePaymentFailure,
   stripeFailureMessageJa,
@@ -126,15 +127,13 @@ describe('serialize / parse payment failure', () => {
   });
 
   it('IAP reason のstatus code・更新状態もround-tripで保持する', () => {
-    const iapRecord: PaymentFailureRecord = {
-      reason: {
-        code: 'billing_retry',
-        statusCode: 0,
-        billingRetryStatus: '1',
-        autoRenewStatus: '1',
-      },
+    const reason = {
+      code: 'billing_retry' as const,
+      statusCode: 0,
+      billingRetryStatus: '1',
+      autoRenewStatus: '1',
     };
-    expect(parsePaymentFailure(serializePaymentFailure(iapRecord))).toEqual(iapRecord);
+    expect(parsePaymentFailure(serializeIapFailureReason(reason))).toEqual({ reason });
   });
 
   it('空 / 不正 JSON は null', () => {
