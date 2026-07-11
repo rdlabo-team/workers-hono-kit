@@ -26,8 +26,6 @@ export interface StripeFailureReason {
 
 /** Normalized reason persisted for an App Store / Google Play subscription failure. */
 export interface IapFailureReason {
-  /** Provider discriminator. */
-  provider: 'ios' | 'android';
   /** Stable machine-readable classification. */
   code: 'billing_retry' | 'auto_renew_off' | 'subscription_canceled' | 'subscription_gone';
   /** Provider response status code when present (Apple verifyReceipt status / Google error code). */
@@ -60,9 +58,10 @@ export type PaymentFailureSource =
  */
 export interface PaymentFailureRecord {
   reason: PaymentFailureReason;
-  source: PaymentFailureSource;
+  /** Capture path. Optional for IAP because `payment_failed.type` already identifies the provider/path. */
+  source?: PaymentFailureSource;
   /** ISO 8601 timestamp of when the failure was captured. */
-  occurredAt: string;
+  occurredAt?: string;
 }
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -246,7 +245,12 @@ export function parsePaymentFailure(receipt: string | null | undefined): Payment
   try {
     const parsed = JSON.parse(receipt) as unknown;
     const r = asRecord(parsed);
-    if (!r || !asRecord(r.reason) || typeof r.source !== 'string' || typeof r.occurredAt !== 'string') {
+    if (
+      !r ||
+      !asRecord(r.reason) ||
+      (r.source !== undefined && typeof r.source !== 'string') ||
+      (r.occurredAt !== undefined && typeof r.occurredAt !== 'string')
+    ) {
       return null;
     }
     return parsed as PaymentFailureRecord;

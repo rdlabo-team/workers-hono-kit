@@ -1,6 +1,6 @@
 {
   "name": "@rdlabo/workers-hono-kit",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "private": false,
   "publishConfig": {
     "access": "public"

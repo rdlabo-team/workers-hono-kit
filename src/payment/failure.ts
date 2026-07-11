@@ -1,5 +1,5 @@
 import { stripeFailureMessageJa } from '../stripe/failure.js';
-import type { PaymentFailureReason } from '../stripe/failure.js';
+import type { PaymentFailureReason, StripeFailureReason } from '../stripe/failure.js';
 
 /**
  * Provider-agnostic status of a row in the `payment_failed` table.
@@ -57,7 +57,8 @@ export function paymentFailureMessageJa(input: {
   if (input.status === 'failed' && (input.type === 'ios' || input.type === 'android')) {
     return IAP_FAILED_MESSAGE_JA[input.type];
   }
-  const stripeReason = input.reason && !('provider' in input.reason) ? input.reason : null;
+  const stripeReason: StripeFailureReason | null =
+    input.type === 'ios' || input.type === 'android' ? null : (input.reason ?? null);
   return stripeFailureMessageJa(stripeReason);
 }
 
