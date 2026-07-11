@@ -125,6 +125,21 @@ describe('serialize / parse payment failure', () => {
     expect(parsePaymentFailure(serializePaymentFailure(record))).toEqual(record);
   });
 
+  it('IAP reason のstatus code・更新状態もround-tripで保持する', () => {
+    const iapRecord: PaymentFailureRecord = {
+      reason: {
+        provider: 'ios',
+        code: 'billing_retry',
+        statusCode: 0,
+        billingRetryStatus: '1',
+        autoRenewStatus: '1',
+      },
+      source: 'iap',
+      occurredAt: '2026-07-11T00:00:00.000Z',
+    };
+    expect(parsePaymentFailure(serializePaymentFailure(iapRecord))).toEqual(iapRecord);
+  });
+
   it('空 / 不正 JSON は null', () => {
     expect(parsePaymentFailure(null)).toBeNull();
     expect(parsePaymentFailure('')).toBeNull();

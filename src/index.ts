@@ -79,6 +79,8 @@ export type {
   StripeFailureReason,
   PaymentFailureSource,
   PaymentFailureRecord,
+  PaymentFailureReason,
+  IapFailureReason,
   PaymentDeclinedBody,
 } from './stripe/failure.js';
 export { classifyStripeReconcile } from './stripe/reconcile.js';

@@ -24,6 +24,25 @@ export interface StripeFailureReason {
   subscriptionId?: string;
 }
 
+/** Normalized reason persisted for an App Store / Google Play subscription failure. */
+export interface IapFailureReason {
+  /** Provider discriminator. */
+  provider: 'ios' | 'android';
+  /** Stable machine-readable classification. */
+  code: 'billing_retry' | 'auto_renew_off' | 'subscription_canceled' | 'subscription_gone';
+  /** Provider response status code when present (Apple verifyReceipt status / Google error code). */
+  statusCode?: number;
+  /** Apple auto-renew status (`'0'` means disabled). */
+  autoRenewStatus?: string;
+  /** Apple billing-retry status (`'1'` means retrying a failed renewal). */
+  billingRetryStatus?: string;
+  /** Google cancellation reason code (0=user, 1=system, 2=replaced, 3=developer). */
+  cancelReason?: number;
+}
+
+/** Provider-specific diagnostic reason stored in `payment_failed.receipt`. */
+export type PaymentFailureReason = StripeFailureReason | IapFailureReason;
+
 /** Where a {@link PaymentFailureRecord} was captured. */
 export type PaymentFailureSource =
   | 'webhook.invoice.payment_failed'
@@ -40,7 +59,7 @@ export type PaymentFailureSource =
  * on read via {@link stripeFailureMessageJa} so that wording changes never require a data migration.
  */
 export interface PaymentFailureRecord {
-  reason: StripeFailureReason;
+  reason: PaymentFailureReason;
   source: PaymentFailureSource;
   /** ISO 8601 timestamp of when the failure was captured. */
   occurredAt: string;
