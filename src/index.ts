@@ -93,13 +93,19 @@ export type { PaymentFailureStatus, PaymentFailureType } from './payment/failure
 // in-app purchase (Apple / Google)
 export { classifyAppleRenewal, verifyAppleReceipt } from './iap/apple.js';
 export type {
+  AppleRenewalClassification,
   AppleRenewalState,
   AppleVerifyReceiptResponse,
   ApplePendingRenewalInfo,
   AppleLatestReceiptInfo,
 } from './iap/apple.js';
 export { classifyGoogleSubscription, getGoogleSubscription, googleAccessToken } from './iap/google.js';
-export type { GoogleSubscriptionState, GoogleSubscriptionPurchase, GoogleOAuthCredentials } from './iap/google.js';
+export type {
+  GoogleSubscriptionClassification,
+  GoogleSubscriptionState,
+  GoogleSubscriptionPurchase,
+  GoogleOAuthCredentials,
+} from './iap/google.js';
 
 // db
 export { retryWhenDeadlock } from './db/retry.js';

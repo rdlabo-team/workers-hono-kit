@@ -19,7 +19,10 @@ describe('classifyGoogleSubscription', () => {
   });
 
   it('410 エラー → gone', () => {
-    expect(classifyGoogleSubscription({ error: { code: 410, message: 'expired' } }, NOW).state).toBe('gone');
+    expect(classifyGoogleSubscription({ error: { code: 410, message: 'expired' } }, NOW)).toEqual({
+      state: 'gone',
+      statusCode: 410,
+    });
   });
 
   it('410 以外のエラー → unknown', () => {
@@ -28,6 +31,11 @@ describe('classifyGoogleSubscription', () => {
 
   it('失効・autoRenewing=true・cancelReason 無し（account hold 等） → unknown', () => {
     expect(classifyGoogleSubscription({ expiryTimeMillis: PAST, autoRenewing: true }, NOW).state).toBe('unknown');
+  });
+
+  it('expiryTimeMillis 欠損・不正値は active にせず unknown', () => {
+    expect(classifyGoogleSubscription({}, NOW).state).toBe('unknown');
+    expect(classifyGoogleSubscription({ expiryTimeMillis: 'invalid' }, NOW).state).toBe('unknown');
   });
 });
 
