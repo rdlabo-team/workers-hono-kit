@@ -42,3 +42,5 @@ export type { HonoDrizzleConfigOptions, ResolvedDbSecret } from './orm-config.js
 
 export { baselineMigrations, readBaselineEntry } from './migrate.js';
 export type { BaselineMigrationsOptions, BaselineResult, BaselineEntry } from './migrate.js';
+
+export { reopenGuardedPaymentFailedSet } from './payment-failed.js';

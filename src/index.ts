@@ -81,6 +81,23 @@ export type {
   PaymentFailureRecord,
   PaymentDeclinedBody,
 } from './stripe/failure.js';
+export { classifyStripeReconcile } from './stripe/reconcile.js';
+export type { StripeReconcileAction } from './stripe/reconcile.js';
+
+// payment (provider-agnostic; web-standard only). reopenGuardedPaymentFailedSet is drizzle-based → './db'.
+export { paymentFailureMessageJa, iapFailureKey, UNRESOLVED_PAYMENT_STATUSES } from './payment/failure.js';
+export type { PaymentFailureStatus, PaymentFailureType } from './payment/failure.js';
+
+// in-app purchase (Apple / Google)
+export { classifyAppleRenewal, verifyAppleReceipt } from './iap/apple.js';
+export type {
+  AppleRenewalState,
+  AppleVerifyReceiptResponse,
+  ApplePendingRenewalInfo,
+  AppleLatestReceiptInfo,
+} from './iap/apple.js';
+export { classifyGoogleSubscription, getGoogleSubscription, googleAccessToken } from './iap/google.js';
+export type { GoogleSubscriptionState, GoogleSubscriptionPurchase, GoogleOAuthCredentials } from './iap/google.js';
 
 // db
 export { retryWhenDeadlock } from './db/retry.js';
