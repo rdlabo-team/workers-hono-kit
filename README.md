@@ -11,6 +11,7 @@ It provides the building blocks a NestJS-style API needs but that don't run on `
 - **Deadlock retry** (`ER_LOCK_DEADLOCK` exponential backoff) and an optional **MySQL data layer** (`@rdlabo/workers-hono-kit/db`) for Hyperdrive + Drizzle.
 - **AI Gateway**: route `@ai-sdk` models through the Cloudflare AI Gateway.
 - **Stripe** Workers-native client + async webhook verification.
+- **Payment failure & subscription reconcile**: provider-agnostic `payment_failed` helpers — Stripe decline reasons → Japanese messages, Apple / Google subscription-renewal classification, `iapFailureKey` / receipt (de)serialization, and Stripe reconcile branch decisions.
 - **Testing helpers** (`@rdlabo/workers-hono-kit/testing`): a Drizzle-migration-backed test database, in-memory Firebase fake, configurable test doubles, and Stripe fixtures.
 
 ## Install
@@ -83,6 +84,16 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
 | `KVCache` / `KVNamespace` / `KVCacheOptions` | Workers-KV cache-aside helper (key `appName+version+table_type_column`, sha256 for string ids, TTL clamped ≥60s). Set `appName` / `version` per application. |
 | `createStripeClient(secret, opts?)` / `verifyStripeWebhook(...)` / `CreateStripeClientOptions` | Workers-native Stripe client (fetch transport) + async webhook verification (SubtleCrypto). `apiVersion` optional (pin to a fixed Stripe API version). |
+| `extractStripeFailureReason(source)` / `StripeFailureReason` | Duck-type a Stripe `PaymentIntent` / `Invoice` / `{ paymentIntent?, invoice? }` / thrown error into a normalized `{ code, declineCode, message, paymentIntentId, invoiceId, subscriptionId }` (SDK-free), or `null`. |
+| `stripeFailureMessageJa(reason)` | Render a `StripeFailureReason` (or `null`) as a single user-facing Japanese sentence (`decline_code` > `code`; fraud codes masked; unknown → generic). |
+| `PaymentDeclinedError` / `toPaymentDeclinedError(error, status?)` / `PaymentDeclinedBody` | `HTTPException` carrying a verbatim `{ statusCode, message, code?, declineCode? }` body for a synchronous card decline (defaults to `400`). `toPaymentDeclinedError` returns `null` for non-declines (re-throw → 500). |
+| `classifyStripeReconcile(subscription)` / `StripeReconcileAction` | Classify an expanded Stripe subscription into `trial` / `clear` / `canceled` / `failed` / `action_required` / `none` (termination evaluated before `succeeded`). Consumer does the DB write. |
+| `serializePaymentFailure(record)` / `parsePaymentFailure(receipt)` / `PaymentFailureRecord` / `PaymentFailureReason` / `PaymentFailureSource` | (De)serialize the `payment_failed.receipt` JSON. `parsePaymentFailure` restores both a full Stripe record and a bare IAP reason. |
+| `serializeIapFailureReason(reason)` / `IapFailureReason` | Serialize an IAP reason (`billing_retry` / `auto_renew_off` / `subscription_canceled` / `subscription_gone` + provider codes) directly, without the source/timestamp wrapper. |
+| `paymentFailureMessageJa(input)` / `PaymentFailureStatus` / `PaymentFailureType` / `UNRESOLVED_PAYMENT_STATUSES` | Provider-agnostic Japanese message for a `payment_failed` row (`canceled` re-subscribe prompt, IAP `failed` App Store/Google Play prompt, else Stripe wording). `UNRESOLVED_PAYMENT_STATUSES` = everything except `resolved` for read/resolve `WHERE`. |
+| `iapFailureKey(input)` | Provider-native `payment_failed.recursions_id`: iOS `${original_transaction_id}:${expires_date_ms}`, Android `${orderId}` (provider is in the `type` column). |
+| `verifyAppleReceipt(receipt, opts)` / `classifyAppleRenewal(verify, now)` / `AppleRenewalClassification` / `AppleRenewalState` / `AppleVerifyReceiptResponse` / `ApplePendingRenewalInfo` / `AppleLatestReceiptInfo` | Verify an App Store receipt (production → sandbox fallback; inject `password` / `fetchImpl`) and classify it into `billing_retry` / `lapsed` / `active` / `unknown` plus the raw fields used (`statusCode` / `billingRetryStatus` / `autoRenewStatus`, latest `original_transaction_id` / `expires_date_ms`). |
+| `googleAccessToken(creds, fetch?)` / `getGoogleSubscription(opts)` / `classifyGoogleSubscription(purchase, now)` / `GoogleSubscriptionClassification` / `GoogleSubscriptionState` / `GoogleSubscriptionPurchase` / `GoogleOAuthCredentials` | Exchange a refresh token for an Android Publisher access token (throws on `invalid_grant`), fetch a subscription purchase, and classify it into `canceled` / `gone` / `active` / `unknown` plus raw `statusCode` / `cancelReason`. |
 | `sendInChunks(queue, messages, options?)` / `QueueLike` / `QueueSendMessage` | Send queue messages in bounded chunks to stay under the Workers subrequest cap per invocation. `options.chunkSize` sets the per-batch size (defaults to and is capped at 100). |
 | `processBatch(batch, handler, options?)` / `MessageBatchLike` / `QueueMessageLike` / `ProcessBatchOptions` / `ProcessBatchResult` | Process a queue batch with bounded concurrency (consumer-side counterpart to `sendInChunks`). |
 | `createQueueErrorHandler(options)` / `CreateQueueErrorHandlerOptions` | Factory for `processBatch`'s `onError`: logs every failure; optional Sentry capture with queue/message context; optional `maxRetries` gate (report only on final attempt). |
@@ -502,6 +513,62 @@ import { createStripeClient, verifyStripeWebhook } from '@rdlabo/workers-hono-ki
 
 const stripe = createStripeClient(secret); // or { apiVersion: '2024-04-10' } to pin
 const event = await verifyStripeWebhook(secret, webhookSecret, rawBody, c.req.header('stripe-signature') ?? '');
+```
+
+### Payment failure & subscription reconcile
+
+Store only the raw reason; render the user-facing message on read (so wording changes never need a migration).
+
+```ts
+import {
+  extractStripeFailureReason,
+  serializePaymentFailure,
+  paymentFailureMessageJa,
+} from '@rdlabo/workers-hono-kit';
+
+// On a Stripe failure webhook: persist the normalized reason.
+const reason = extractStripeFailureReason(event.data.object);
+if (reason) {
+  await db.write.insert(paymentFailed).values({
+    type: 'stripe',
+    status: 'failed',
+    receipt: serializePaymentFailure({ reason, source: 'webhook.invoice.payment_failed', occurredAt }),
+  });
+}
+
+// On read: provider-agnostic Japanese message.
+const message = paymentFailureMessageJa({ status: row.status, type: row.type, reason: parsed?.reason });
+```
+
+In-app purchase: verify → classify → key the row by billing cycle.
+
+```ts
+import {
+  verifyAppleReceipt,
+  classifyAppleRenewal,
+  iapFailureKey,
+  serializeIapFailureReason,
+} from '@rdlabo/workers-hono-kit';
+
+const verify = await verifyAppleReceipt(receipt, { password: appleSharedSecret });
+const cls = classifyAppleRenewal(verify, Date.now());
+if (cls.state === 'billing_retry' || cls.state === 'lapsed') {
+  await db.write.insert(paymentFailed).values({
+    type: 'ios',
+    status: cls.state === 'billing_retry' ? 'failed' : 'canceled',
+    recursions_id: iapFailureKey({
+      platform: 'ios',
+      originalTransactionId: cls.originalTransactionId!,
+      expiresDateMs: cls.expiresDateMs!,
+    }),
+    receipt: serializeIapFailureReason({
+      code: cls.state === 'billing_retry' ? 'billing_retry' : 'subscription_canceled',
+      statusCode: cls.statusCode,
+      billingRetryStatus: cls.billingRetryStatus,
+      autoRenewStatus: cls.autoRenewStatus,
+    }),
+  });
+}
 ```
 
 ### Testing
