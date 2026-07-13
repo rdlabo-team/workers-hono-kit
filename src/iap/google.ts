@@ -38,13 +38,22 @@ export interface GoogleSubscriptionPurchase {
  */
 export type GoogleSubscriptionState = 'canceled' | 'gone' | 'active' | 'unknown';
 
+/** Google subscription classification plus provider diagnostic codes used by persistence. */
+export interface GoogleSubscriptionClassification {
+  state: GoogleSubscriptionState;
+  /** Google error-body code, such as 410. */
+  statusCode?: number;
+  /** Google cancellation reason (0=user, 1=system, 2=replaced, 3=developer). */
+  cancelReason?: number;
+}
+
 /**
  * Classify a Google subscriptions.get response into a {@link GoogleSubscriptionState}.
  *
  * @param purchase - The response body (duck-typed); may be `{ error: { code } }`.
  * @param now - Current epoch-ms (`Date.now()`); injected for determinism/testing.
  */
-export function classifyGoogleSubscription(purchase: unknown, now: number): { state: GoogleSubscriptionState } {
+export function classifyGoogleSubscription(purchase: unknown, now: number): GoogleSubscriptionClassification {
   const p = asRecord(purchase);
   if (!p) {
     return { state: 'unknown' };
@@ -52,18 +61,21 @@ export function classifyGoogleSubscription(purchase: unknown, now: number): { st
   const err = asRecord(p.error);
   if (err) {
     // 410 = "The subscription purchase is no longer available for query" (expired too long) = churned.
-    return { state: err.code === 410 ? 'gone' : 'unknown' };
+    const statusCode = typeof err.code === 'number' ? err.code : undefined;
+    return { state: statusCode === 410 ? 'gone' : 'unknown', statusCode };
   }
   const expiryMs = Number(p.expiryTimeMillis);
-  const isExpired = Number.isFinite(expiryMs) && expiryMs < now;
-  const willNotRenew = p.autoRenewing === false || p.cancelReason !== undefined;
+  const hasValidExpiry = Number.isFinite(expiryMs);
+  const isExpired = hasValidExpiry && expiryMs < now;
+  const cancelReason = typeof p.cancelReason === 'number' ? p.cancelReason : undefined;
+  const willNotRenew = p.autoRenewing === false || cancelReason !== undefined;
   if (isExpired && willNotRenew) {
-    return { state: 'canceled' };
+    return { state: 'canceled', cancelReason };
   }
-  if (!isExpired) {
-    return { state: 'active' };
+  if (hasValidExpiry && !isExpired) {
+    return { state: 'active', cancelReason };
   }
-  return { state: 'unknown' };
+  return { state: 'unknown', cancelReason };
 }
 
 /** OAuth service-account credentials for the Android Publisher API (per-app; inject, never hardcode in kit). */

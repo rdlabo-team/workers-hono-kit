@@ -1,5 +1,5 @@
 import { stripeFailureMessageJa } from '../stripe/failure.js';
-import type { StripeFailureReason } from '../stripe/failure.js';
+import type { PaymentFailureReason, StripeFailureReason } from '../stripe/failure.js';
 
 /**
  * Provider-agnostic status of a row in the `payment_failed` table.
@@ -49,7 +49,7 @@ export function paymentFailureMessageJa(input: {
   status: PaymentFailureStatus;
   /** The row `type` (stripe/ios/android). Typed as `string` since it comes from the DB column. */
   type?: string | null;
-  reason?: StripeFailureReason | null;
+  reason?: PaymentFailureReason | null;
 }): string {
   if (input.status === 'canceled') {
     return CANCELED_MESSAGE_JA;
@@ -57,30 +57,31 @@ export function paymentFailureMessageJa(input: {
   if (input.status === 'failed' && (input.type === 'ios' || input.type === 'android')) {
     return IAP_FAILED_MESSAGE_JA[input.type];
   }
-  return stripeFailureMessageJa(input.reason ?? null);
+  const stripeReason: StripeFailureReason | null =
+    input.type === 'ios' || input.type === 'android' ? null : (input.reason ?? null);
+  return stripeFailureMessageJa(stripeReason);
 }
 
 /**
- * Build the `payment_failed.recursions_id` (PRIMARY KEY) with a per-type namespace.
+ * Build the provider-native `payment_failed.recursions_id`.
  *
  * @remarks
- * - iOS: `ios:${original_transaction_id}:${expires_date_ms}`. `original_transaction_id` is stable
+ * - iOS: `${original_transaction_id}:${expires_date_ms}`. `original_transaction_id` is stable
  *   across re-subscribes, so keying on it alone would let the resolved-reopen guard permanently mask
  *   every event after the first. Including `expires_date_ms` makes each billing cycle a distinct row,
  *   while the same cycle's daily reconcile (billing-retry) still converges to one row.
- * - Android: `android:${orderId}` — Google issues a new orderId per subscription, so it is already
- *   cycle-specific; the `android:` prefix only guards against cross-type PK collisions.
+ * - Android: `${orderId}` — Google issues a new orderId per subscription, so it is already cycle-specific.
  *
  * Stripe rows use the invoice / subscription id directly (globally unique) and need no helper.
  *
- * @remarks Fits the fleet's `payment_failed.recursions_id` `varchar(50)` (iOS ≤ ~38, Android ≤ ~36 chars).
+ * The provider is stored separately in the `type` column. Provider-native ID formats are disjoint in practice
+ * (Apple numeric pair / Google `GPA.*` / Stripe `in_*` or `sub_*`), so duplicating `type` in the primary-key value
+ * is unnecessary.
  */
 export function iapFailureKey(
   input:
     | { platform: 'ios'; originalTransactionId: string; expiresDateMs: string | number }
     | { platform: 'android'; orderId: string },
 ): string {
-  return input.platform === 'ios'
-    ? `ios:${input.originalTransactionId}:${input.expiresDateMs}`
-    : `android:${input.orderId}`;
+  return input.platform === 'ios' ? `${input.originalTransactionId}:${input.expiresDateMs}` : input.orderId;
 }

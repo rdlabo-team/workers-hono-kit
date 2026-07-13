@@ -23,6 +23,9 @@ describe('classifyAppleRenewal', () => {
       state: 'billing_retry',
       originalTransactionId: 'otx1',
       expiresDateMs: PAST,
+      statusCode: 0,
+      billingRetryStatus: '1',
+      autoRenewStatus: '1',
     });
   });
 
@@ -74,7 +77,11 @@ describe('classifyAppleRenewal', () => {
       ],
     };
     // otxB の pending を読む → lapsed（otxA の billing_retry を誤読しない）。
-    expect(classifyAppleRenewal(v, NOW).state).toBe('lapsed');
+    expect(classifyAppleRenewal(v, NOW)).toMatchObject({
+      state: 'lapsed',
+      billingRetryStatus: undefined,
+      autoRenewStatus: '0',
+    });
   });
 });
 

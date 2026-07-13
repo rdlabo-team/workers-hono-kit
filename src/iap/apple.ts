@@ -50,6 +50,19 @@ export interface AppleVerifyReceiptResponse {
  */
 export type AppleRenewalState = 'billing_retry' | 'lapsed' | 'active' | 'unknown';
 
+/** Apple renewal classification plus the exact provider fields used to reach it. */
+export interface AppleRenewalClassification {
+  state: AppleRenewalState;
+  originalTransactionId?: string;
+  expiresDateMs?: string;
+  /** Apple verifyReceipt response status (normally 0 for a successfully verified receipt). */
+  statusCode?: number;
+  /** Value from the pending-renewal entry matched to `originalTransactionId`. */
+  billingRetryStatus?: string;
+  /** Value from the pending-renewal entry matched to `originalTransactionId`. */
+  autoRenewStatus?: string;
+}
+
 /**
  * Classify an Apple verifyReceipt response into an {@link AppleRenewalState}.
  *
@@ -62,11 +75,9 @@ export type AppleRenewalState = 'billing_retry' | 'lapsed' | 'active' | 'unknown
  * @param now - Current epoch-ms (`Date.now()`); injected for determinism/testing.
  * @returns The state plus the latest `original_transaction_id` / `expires_date_ms` (for the row key).
  */
-export function classifyAppleRenewal(
-  verify: unknown,
-  now: number,
-): { state: AppleRenewalState; originalTransactionId?: string; expiresDateMs?: string } {
+export function classifyAppleRenewal(verify: unknown, now: number): AppleRenewalClassification {
   const v = asRecord(verify);
+  const statusCode = typeof v?.status === 'number' ? v.status : undefined;
   // 消耗型など expires_date_ms 欠損エントリを除外してから最新（max expires）を選ぶ。
   // 欠損値を Number() すると NaN で比較が常に false になり、先頭の欠損行が最後まで残って
   // 誤って 'active'（isExpired=false）を返すため、有効な expires を持つ行だけを対象にする。
@@ -81,7 +92,7 @@ export function classifyAppleRenewal(
   }, undefined);
   const originalTransactionId = latest?.original_transaction_id;
   if (!latest || !originalTransactionId) {
-    return { state: 'unknown' };
+    return { state: 'unknown', statusCode };
   }
   // 複数サブスク商品時に別商品の renewal info を読まないよう、latest と同じ original_transaction_id の
   // pending エントリを優先（無ければ先頭にフォールバック）。
@@ -89,7 +100,13 @@ export function classifyAppleRenewal(
   const pending = pendingArr.find((p) => p.original_transaction_id === originalTransactionId) ?? pendingArr.at(0);
   const expiresMs = Number(latest.expires_date_ms);
   const isExpired = Number.isFinite(expiresMs) && expiresMs < now;
-  const base = { originalTransactionId, expiresDateMs: latest.expires_date_ms };
+  const base = {
+    originalTransactionId,
+    expiresDateMs: latest.expires_date_ms,
+    statusCode,
+    billingRetryStatus: pending?.is_in_billing_retry_period,
+    autoRenewStatus: pending?.auto_renew_status,
+  };
 
   if (pending?.is_in_billing_retry_period === '1') {
     return { state: 'billing_retry', ...base };

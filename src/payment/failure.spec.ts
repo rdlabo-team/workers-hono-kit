@@ -37,14 +37,14 @@ describe('paymentFailureMessageJa', () => {
 });
 
 describe('iapFailureKey', () => {
-  it('iOS はサイクル固有（otx:expires_date_ms）で名前空間化', () => {
+  it('iOS はtype接頭辞なしのサイクル固有ID（otx:expires_date_ms）', () => {
     expect(iapFailureKey({ platform: 'ios', originalTransactionId: 'otx1', expiresDateMs: '1719817200000' })).toBe(
-      'ios:otx1:1719817200000',
+      'otx1:1719817200000',
     );
   });
 
-  it('Android は orderId を名前空間化', () => {
-    expect(iapFailureKey({ platform: 'android', orderId: 'GPA.1' })).toBe('android:GPA.1');
+  it('Android は orderId をそのまま返す', () => {
+    expect(iapFailureKey({ platform: 'android', orderId: 'GPA.1' })).toBe('GPA.1');
   });
 });
 

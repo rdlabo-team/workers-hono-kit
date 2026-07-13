@@ -24,6 +24,23 @@ export interface StripeFailureReason {
   subscriptionId?: string;
 }
 
+/** Normalized reason persisted for an App Store / Google Play subscription failure. */
+export interface IapFailureReason {
+  /** Stable machine-readable classification. */
+  code: 'billing_retry' | 'auto_renew_off' | 'subscription_canceled' | 'subscription_gone';
+  /** Provider response status code when present (Apple verifyReceipt status / Google error code). */
+  statusCode?: number;
+  /** Apple auto-renew status (`'0'` means disabled). */
+  autoRenewStatus?: string;
+  /** Apple billing-retry status (`'1'` means retrying a failed renewal). */
+  billingRetryStatus?: string;
+  /** Google cancellation reason code (0=user, 1=system, 2=replaced, 3=developer). */
+  cancelReason?: number;
+}
+
+/** Provider-specific diagnostic reason stored in `payment_failed.receipt`. */
+export type PaymentFailureReason = StripeFailureReason | IapFailureReason;
+
 /** Where a {@link PaymentFailureRecord} was captured. */
 export type PaymentFailureSource =
   | 'webhook.invoice.payment_failed'
@@ -40,10 +57,11 @@ export type PaymentFailureSource =
  * on read via {@link stripeFailureMessageJa} so that wording changes never require a data migration.
  */
 export interface PaymentFailureRecord {
-  reason: StripeFailureReason;
-  source: PaymentFailureSource;
+  reason: PaymentFailureReason;
+  /** Capture path. Optional for IAP because `payment_failed.type` already identifies the provider/path. */
+  source?: PaymentFailureSource;
   /** ISO 8601 timestamp of when the failure was captured. */
-  occurredAt: string;
+  occurredAt?: string;
 }
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -214,6 +232,11 @@ export function serializePaymentFailure(record: PaymentFailureRecord): string {
   return JSON.stringify(record);
 }
 
+/** Serialize an IAP reason directly, without redundant provider/source/timestamp wrappers. */
+export function serializeIapFailureReason(reason: IapFailureReason): string {
+  return JSON.stringify(reason);
+}
+
 /**
  * Parse a `payment_failed.receipt` value back into a {@link PaymentFailureRecord}.
  *
@@ -227,10 +250,23 @@ export function parsePaymentFailure(receipt: string | null | undefined): Payment
   try {
     const parsed = JSON.parse(receipt) as unknown;
     const r = asRecord(parsed);
-    if (!r || !asRecord(r.reason) || typeof r.source !== 'string' || typeof r.occurredAt !== 'string') {
+    if (!r) {
       return null;
     }
-    return parsed as PaymentFailureRecord;
+    if (asRecord(r.reason)) {
+      if (
+        (r.source !== undefined && typeof r.source !== 'string') ||
+        (r.occurredAt !== undefined && typeof r.occurredAt !== 'string')
+      ) {
+        return null;
+      }
+      return parsed as PaymentFailureRecord;
+    }
+    // IAP rows store the reason itself. `code` is required so arbitrary JSON is not accepted as a reason.
+    if (typeof r.code === 'string') {
+      return { reason: parsed as IapFailureReason };
+    }
+    return null;
   } catch {
     return null;
   }
