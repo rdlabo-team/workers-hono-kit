@@ -2,11 +2,11 @@
 
 Infrastructure toolkit for building APIs on [Hono](https://hono.dev) + [Cloudflare Workers](https://workers.cloudflare.com).
 
-It provides the building blocks a NestJS-style API needs but that don't run on `workerd` (no Node.js AWS SDK, no `firebase-admin`), plus middleware that matches Express / NestJS response semantics byte-for-byte:
+It provides the building blocks a NestJS-style API needs but that don't run on `workerd` (no Node.js AWS SDK, no `firebase-admin`), plus middleware for common HTTP response concerns:
 
 - **Firebase ID-token verification** on Workers via [`jose`](https://github.com/panva/jose) (RS256 against Google's securetoken JWKS), with optional Identity Toolkit REST for `getUser` / `deleteUser`.
 - **AWS Secrets Manager / STS AssumeRole / CloudFront signed URLs** via SigV4-signed `fetch` ([`aws4fetch`](https://github.com/mhart/aws4fetch)) or Web Crypto — no AWS SDK.
-- **Middleware**: `finalizeResponse` (Express-compatible weak ETag + JSON charset), `validate` (NestJS `ValidationPipe`-shaped 400), and zod number-coercion helpers.
+- **Middleware**: `finalizeResponse` (weak ETag via `hono/etag`), `validate` (NestJS `ValidationPipe`-shaped 400), and zod number-coercion helpers.
 - **Standard API errors**: `createHttpErrorHandler` / `notFoundHandler` / `HttpStatus`.
 - **Deadlock retry** (`ER_LOCK_DEADLOCK` exponential backoff) and an optional **MySQL data layer** (`@rdlabo/workers-hono-kit/db`) for Hyperdrive + Drizzle.
 - **AI Gateway**: route `@ai-sdk` models through the Cloudflare AI Gateway.
@@ -50,7 +50,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 
 | Export | Description |
 | --- | --- |
-| `finalizeResponse()` | Middleware that adds an Express-compatible weak `ETag` and JSON `charset=utf-8`. |
+| `finalizeResponse()` | Middleware that adds a weak `ETag` (delegates to `hono/etag`; also handles `If-None-Match` → `304`). |
 | `validate(target, schema, options?)` | Zod validator → NestJS `ValidationPipe`-shaped `400` (`{ statusCode, message[], error }`). `options.onValidationError(err, c)` to report (e.g. Sentry). |
 | `createValidate({ sentry? })` | Bound `validate` factory. Pass `sentry` on Sentry apps; omit for console-only (review, cbs-ai). |
 | `createSentryValidate(sentry)` | **Deprecated** — use `createValidate({ sentry })`. |
@@ -66,7 +66,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `getUserProtocol(c)` / `IUserProtocol` | Read client IP / UA (`CF-Connecting-IP` → `X-Forwarded-For`). |
 | `getAppInfo(c)` / `AppInfo` | Read `x-amz-meta-version` / `x-amz-meta-uuid`. |
 | `resolveAppEnv(env)` / `isProductionEnv(env)` / `AppEnv` | Resolve `'development'` / `'production'` from `env.APP_ENV` (defaults to `'production'` for safety). |
-| `HttpStatus` | HTTP status enum identical to NestJS `@nestjs/common`. |
+| `HttpStatus` | Standard HTTP status code enum (IANA registry). |
 | `createHttpErrorHandler(options?)` / `HttpErrorHandlerOptions` | `app.onError()` handler that maps a thrown `HTTPException` to `{ statusCode, message, error? }` (`401` omits `error`). Optional custom error predicate and unhandled-error report hook. Unhandled errors log via `console.error` (mysql2 errors include `sqlMessage` / `errno` when detectable). |
 | `createAppErrorHandler(options?)` / `CreateAppErrorHandlerOptions` | Standard `app.onError`: {@link createQueryFailedErrorHandler} + default {@link classifyGenericMysqlDriverError} + optional `sentry` (Sentry apps), `getReportError` / `reportError` (tests / container), or neither (no external reporting). |
 | `createQueryFailedErrorHandler(options)` / `QueryFailedClassifier` / `ClassifiedDbError` | Lower-level compose when you need full control over `classify` + `onUnhandledError` without defaults. |
@@ -195,7 +195,7 @@ Requires the `drizzle-orm` and `mysql2` peers. Consolidates duplicated test boil
 
 ## Usage
 
-### Response finalization (ETag / charset)
+### Response finalization (ETag)
 
 ```ts
 import { Hono } from 'hono';

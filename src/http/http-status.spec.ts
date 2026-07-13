@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HttpStatus } from './http-status.js';
 
 describe('HttpStatus', () => {
-  it('NestJS と同じ代表的なコード値を持つ', () => {
+  it('標準の代表的なコード値を持つ', () => {
     expect(HttpStatus.OK).toBe(200);
     expect(HttpStatus.CREATED).toBe(201);
     expect(HttpStatus.NO_CONTENT).toBe(204);
