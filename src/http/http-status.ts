@@ -1,11 +1,11 @@
 /**
- * HTTP status codes mirroring the `HttpStatus` enum from `@nestjs/common`.
+ * Standard HTTP status codes, keyed by their conventional names.
  *
  * @remarks
- * Provides a single source of truth for referencing status codes by the same names NestJS uses, so a
- * Hono app can emit responses whose status matches a NestJS service byte-for-byte. The member set and
- * numeric values intentionally track `@nestjs/common` rather than the IANA registry, including a few
- * non-standard codes that NestJS ships.
+ * A single source of truth for referencing status codes by name from a Hono app. The member set and
+ * numeric values follow the IANA HTTP status code registry. (Earlier versions mirrored the
+ * `@nestjs/common` `HttpStatus` enum — including its non-standard codes and aliases — for a
+ * NestJS → Hono migration; that parity is no longer maintained.)
  */
 export enum HttpStatus {
   CONTINUE = 100,
@@ -21,10 +21,7 @@ export enum HttpStatus {
   PARTIAL_CONTENT = 206,
   MULTI_STATUS = 207,
   ALREADY_REPORTED = 208,
-  /** Non-standard WebDAV extension carried over from NestJS. */
-  CONTENT_DIFFERENT = 210,
-  /** Multiple Choices (300). Named `AMBIGUOUS` to match NestJS. */
-  AMBIGUOUS = 300,
+  MULTIPLE_CHOICES = 300,
   MOVED_PERMANENTLY = 301,
   FOUND = 302,
   SEE_OTHER = 303,
@@ -51,15 +48,12 @@ export enum HttpStatus {
   EXPECTATION_FAILED = 417,
   /** "I'm a teapot" (418), from RFC 2324. */
   I_AM_A_TEAPOT = 418,
-  /** Misdirected Request (421). Named `MISDIRECTED` to match NestJS. */
-  MISDIRECTED = 421,
+  MISDIRECTED_REQUEST = 421,
   UNPROCESSABLE_ENTITY = 422,
   LOCKED = 423,
   FAILED_DEPENDENCY = 424,
   PRECONDITION_REQUIRED = 428,
   TOO_MANY_REQUESTS = 429,
-  /** Non-standard code carried over from NestJS. */
-  UNRECOVERABLE_ERROR = 456,
   INTERNAL_SERVER_ERROR = 500,
   NOT_IMPLEMENTED = 501,
   BAD_GATEWAY = 502,

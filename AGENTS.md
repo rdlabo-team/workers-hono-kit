@@ -65,7 +65,7 @@ npm run build       # tsc -p tsconfig.build.json → dist/
 
 - **Configuration-injected, not opinionated**: the kit provides building blocks that accept configuration (verifier instances, Drizzle instances, Sentry clients) rather than hard-coding policy. Domain logic, database schemas, and application-specific behavior belong in the consuming project.
 - **Web-standard root**: the root export uses only `fetch`, `crypto.subtle`, `Response`, and other web-standard APIs available on `workerd`. mysql2/drizzle dependencies live in `./db` and `./testing` subpaths.
-- **NestJS parity**: error handlers, validation responses, and HTTP status codes match NestJS byte-for-byte so existing API consumers see no change during NestJS → Hono migration.
+- **NestJS parity (error/validation bodies only)**: error handlers and validation responses still match NestJS byte-for-byte so existing API consumers see no change (their `message` shape is depended on by the fleet frontends). Parity is *not* maintained for ETag (`finalizeResponse` now uses `hono/etag`, not the Express `etag` format) or `HttpStatus` (standard IANA codes, NestJS-only members dropped).
 - **No ORM type identity coupling**: the `./db` subpath never depends on drizzle-orm's type identity — the ORM instance is always supplied by the consumer.
 
 ## When modifying this package
