@@ -28,6 +28,19 @@ export { createAuthMiddleware } from './middleware/auth.js';
 export type { AuthMiddlewareOptions } from './middleware/auth.js';
 export { perfLog } from './middleware/perf-log.js';
 export type { PerfLogOptions, AnalyticsEngineDatasetLike } from './middleware/perf-log.js';
+export {
+  createMaintenanceMiddleware,
+  createMaintenanceWaitHandler,
+  isMaintenanceEnabled,
+  MAINTENANCE_BODY,
+  MAINTENANCE_CODE,
+  MAINTENANCE_WAIT_PATH,
+} from './middleware/maintenance.js';
+export type {
+  MaintenanceBody,
+  MaintenanceMiddlewareOptions,
+  MaintenanceWaitOptions,
+} from './middleware/maintenance.js';
 export { createIsolateMemo } from './container/isolate-memo.js';
 export type { IsolateMemo } from './container/isolate-memo.js';
 export { createContainerRuntime } from './container/middleware.js';
