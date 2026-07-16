@@ -61,7 +61,11 @@ describe('Stripe subscription reconciliation', () => {
 
   it('does not require subscription items when no payment row is needed', () => {
     const invoice = { id: 'in_canceled', status: 'paid', payments: { data: [] } } as unknown as Stripe.Invoice;
-    const canceled = { ...subscription(invoice), status: 'canceled', items: { data: [] } } as Stripe.Subscription;
+    const canceled = {
+      ...subscription(invoice),
+      status: 'canceled',
+      items: { data: [] },
+    } as unknown as Stripe.Subscription;
 
     expect(buildStripeReconcilePlan({ subscription: canceled, invoice, customerId: 'cus_1' })).toMatchObject({
       action: 'canceled',
