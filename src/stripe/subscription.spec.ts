@@ -44,6 +44,30 @@ describe('Stripe subscription reconciliation', () => {
     expect(plan.action).toBe('trial');
     expect(plan.payment).toMatchObject({ recursionsId: 'in_trial', status: 'trialing' });
   });
+
+  it('does not create a payment row from an unexpanded PaymentIntent id', () => {
+    const invoice = {
+      id: 'in_unexpanded',
+      status: 'open',
+      payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_unexpanded' } }] },
+    } as unknown as Stripe.Invoice;
+
+    const plan = buildStripeReconcilePlan({ subscription: subscription(invoice), invoice, customerId: 'cus_1' });
+
+    expect(plan.action).toBe('none');
+    expect(plan.paymentIntent).toBeNull();
+    expect(plan.payment).toBeNull();
+  });
+
+  it('does not require subscription items when no payment row is needed', () => {
+    const invoice = { id: 'in_canceled', status: 'paid', payments: { data: [] } } as unknown as Stripe.Invoice;
+    const canceled = { ...subscription(invoice), status: 'canceled', items: { data: [] } } as Stripe.Subscription;
+
+    expect(buildStripeReconcilePlan({ subscription: canceled, invoice, customerId: 'cus_1' })).toMatchObject({
+      action: 'canceled',
+      payment: null,
+    });
+  });
 });
 
 describe('assertStripeCustomerUpdated', () => {

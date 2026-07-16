@@ -22,7 +22,8 @@ export interface StripeReconcilePlan<TDate = Date> {
 export function stripePaymentIntent(invoice: Stripe.Invoice): Stripe.PaymentIntent | null {
   const payment = invoice.payments?.data[0]?.payment;
   // Stripe's generated type treats data[0] as present, but genuine trials return an empty payments array.
-  return payment?.type === 'payment_intent' ? (payment.payment_intent as Stripe.PaymentIntent) : null;
+  const paymentIntent = payment?.type === 'payment_intent' ? payment.payment_intent : null;
+  return typeof paymentIntent === 'object' && paymentIntent !== null ? paymentIntent : null;
 }
 
 export function buildStripeReconcilePlan<TDate = Date>(options: {
@@ -35,30 +36,34 @@ export function buildStripeReconcilePlan<TDate = Date>(options: {
   const formatDate = options.formatDate ?? ((value: Date) => value as TDate);
   const paymentIntent = stripePaymentIntent(invoice);
   const action = classifyStripeReconcile({ ...subscription, latest_invoice: invoice });
-  const period = subscription.items.data[0];
-
-  const dates = {
-    limitAt: formatDate(new Date(period.current_period_end * 1000)),
-    createdAt: formatDate(new Date(period.current_period_start * 1000)),
-  };
-  const payment =
-    action === 'trial'
-      ? {
-          customerId,
-          recursionsId: invoice.id,
-          status: 'trialing',
-          detail: JSON.stringify(invoice),
-          ...dates,
-        }
-      : paymentIntent
-        ? {
-            customerId,
-            recursionsId: paymentIntent.id,
-            status: paymentIntent.status,
-            detail: JSON.stringify(paymentIntent),
-            ...dates,
-          }
-        : null;
+  let payment: StripeReconcilePaymentRow<TDate> | null = null;
+  if (action === 'trial' || paymentIntent) {
+    const period = subscription.items.data.at(0);
+    if (!period) {
+      throw new Error(`Subscription has no items: ${subscription.id}`);
+    }
+    const dates = {
+      limitAt: formatDate(new Date(period.current_period_end * 1000)),
+      createdAt: formatDate(new Date(period.current_period_start * 1000)),
+    };
+    if (action === 'trial') {
+      payment = {
+        customerId,
+        recursionsId: invoice.id,
+        status: 'trialing',
+        detail: JSON.stringify(invoice),
+        ...dates,
+      };
+    } else if (paymentIntent) {
+      payment = {
+        customerId,
+        recursionsId: paymentIntent.id,
+        status: paymentIntent.status,
+        detail: JSON.stringify(paymentIntent),
+        ...dates,
+      };
+    }
+  }
 
   return { action, paymentIntent, payment };
 }
