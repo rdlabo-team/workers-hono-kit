@@ -99,6 +99,13 @@ export type {
 } from './stripe/failure.js';
 export { classifyStripeReconcile } from './stripe/reconcile.js';
 export type { StripeReconcileAction } from './stripe/reconcile.js';
+export {
+  assertStripeCustomerUpdated,
+  buildStripeReconcilePlan,
+  stripePaymentIntent,
+  STRIPE_RECONCILE_INVOICE_EXPAND,
+} from './stripe/subscription.js';
+export type { StripeReconcilePaymentRow, StripeReconcilePlan } from './stripe/subscription.js';
 
 // payment (provider-agnostic; web-standard only). reopenGuardedPaymentFailedSet is drizzle-based → './db'.
 export { paymentFailureMessageJa, iapFailureKey, UNRESOLVED_PAYMENT_STATUSES } from './payment/failure.js';
