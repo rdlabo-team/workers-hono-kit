@@ -46,6 +46,10 @@ export type { IsolateMemo } from './container/isolate-memo.js';
 export { createContainerRuntime } from './container/middleware.js';
 export type { ContainerBuildContext, ContainerRuntime, ContainerRuntimeOptions } from './container/middleware.js';
 
+// authorization
+export { createRolePolicy } from './authorization/role-policy.js';
+export type { RolePermissionMap, RolePolicy, RolePolicyConfig, RoleRelationMap } from './authorization/role-policy.js';
+
 // http
 export { getUserProtocol } from './http/user-protocol.js';
 export type { IUserProtocol } from './http/user-protocol.js';
