@@ -130,9 +130,7 @@ function isAllowlisted(pathname: string, allowPaths: ReadonlySet<string>): boole
 export function createMaintenanceMiddleware<E extends Env = Env>(
   options: MaintenanceMiddlewareOptions<E>,
 ): MiddlewareHandler<E> {
-  const allowPaths = new Set(
-    (options.allowPaths ?? [MAINTENANCE_WAIT_PATH]).map((p) => normalizePath(p)),
-  );
+  const allowPaths = new Set((options.allowPaths ?? [MAINTENANCE_WAIT_PATH]).map((p) => normalizePath(p)));
   const message = options.message ?? MAINTENANCE_BODY.message;
   const waitHandler = createMaintenanceWaitHandler({
     isEnabled: options.isEnabled,
