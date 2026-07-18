@@ -616,6 +616,40 @@ The package ships three `bin` commands (run via `npx` or an npm script in the co
 | `workers-hono-kit-check-subrequest-fanout [dir…]` | CI gate that greps for per-item external-call fan-outs (`runWithConcurrency(` / `PromisePool` / `.withConcurrency(`) that would eventually exceed the Workers subrequest cap. Annotate a genuinely-safe site with `subrequest-ok`. Scans `src` by default; exits 1 on an un-annotated marker. |
 | `workers-hono-kit-db-baseline [--migrations ./drizzle]` | Brownfield first-deploy helper: record the baseline `0000` migration as *already applied* on an existing MySQL DB without running its DDL (the CLI wrapper around `baselineMigrations` / `readBaselineEntry`). Reads DB credentials from `DB_SECRET` (AWS RDS managed secret) or the individual `DB_*` env vars. |
 
+## Storage-agnostic role policies
+
+`createRolePolicy` builds pure RBAC checks without coupling the policy to a database schema. The
+application can resolve roles from a membership table, a `users.role` column, token claims, or any
+other source.
+
+```ts
+import { createRolePolicy } from '@rdlabo/workers-hono-kit';
+
+type Role = 'owner' | 'admin' | 'member' | 'read';
+type Permission = 'organization.manage' | 'resource.write' | 'resource.read';
+
+const policy = createRolePolicy<Role, Permission>({
+  permissions: {
+    owner: ['organization.manage', 'resource.write', 'resource.read'],
+    admin: ['resource.write', 'resource.read'],
+    member: ['resource.write', 'resource.read'],
+    read: ['resource.read'],
+  },
+  assignableRoles: {
+    owner: ['admin', 'member', 'read'],
+    admin: ['member', 'read'],
+    member: [],
+    read: [],
+  },
+  manageableRoles: {
+    owner: ['admin', 'member', 'read'],
+    admin: ['member', 'read'],
+    member: [],
+    read: [],
+  },
+});
+```
+
 ## Development
 
 ```bash
