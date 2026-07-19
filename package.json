@@ -1,6 +1,6 @@
 {
   "name": "@rdlabo/workers-hono-kit",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -41,7 +41,9 @@
   "bin": {
     "workers-hono-kit-sync-dev-aws": "./scripts/sync-dev-aws.mjs",
     "workers-hono-kit-check-subrequest-fanout": "./scripts/check-subrequest-fanout.mjs",
-    "workers-hono-kit-db-baseline": "./scripts/db-baseline.mjs"
+    "workers-hono-kit-db-baseline": "./scripts/db-baseline.mjs",
+    "workers-hono-kit-check-realtime-bundle": "./scripts/check-realtime-bundle.mjs",
+    "workers-hono-kit-query-realtime-do-metrics": "./scripts/query-realtime-do-metrics.mjs"
   },
   "exports": {
     ".": {
