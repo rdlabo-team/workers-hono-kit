@@ -95,6 +95,17 @@ export type {
 } from './realtime/hibernation.js';
 export { isRetryableDurableObjectError, retryDurableObjectOperation } from './realtime/retry.js';
 export type { DurableObjectErrorLike, DurableObjectRetryOptions } from './realtime/retry.js';
+export { DurableObjectResponseError, invokeDurableObjectFetch } from './realtime/invoke.js';
+export type {
+  DurableObjectFetchRequest,
+  DurableObjectFetchStubLike,
+  InvokeDurableObjectFetchOptions,
+} from './realtime/invoke.js';
+export { parseRealtimeWebSocketProtocolOffer, parseWebSocketProtocols } from './realtime/protocol.js';
+export type {
+  ParseRealtimeWebSocketProtocolOptions,
+  RealtimeWebSocketProtocolOffer,
+} from './realtime/protocol.js';
 
 // cache
 export { KVCache } from './cache/kv-cache.js';
