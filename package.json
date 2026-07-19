@@ -1,6 +1,6 @@
 {
   "name": "@rdlabo/workers-hono-kit",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -71,7 +71,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
