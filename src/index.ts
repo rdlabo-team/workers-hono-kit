@@ -93,8 +93,6 @@ export type {
   WebSocketAutoResponsePairFactory,
   WebSocketPairFactory,
 } from './realtime/hibernation.js';
-export { createLegacySseBridge } from './realtime/legacy-sse.js';
-export type { LegacySseBridgeOptions, RealtimeDurableObjectNamespaceLike } from './realtime/legacy-sse.js';
 export { isRetryableDurableObjectError, retryDurableObjectOperation } from './realtime/retry.js';
 export type { DurableObjectErrorLike, DurableObjectRetryOptions } from './realtime/retry.js';
 
