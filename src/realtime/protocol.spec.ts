@@ -3,11 +3,7 @@ import { parseRealtimeWebSocketProtocolOffer, parseWebSocketProtocols } from './
 
 describe('realtime WebSocket protocol parsing', () => {
   it('splits and trims offered protocols', () => {
-    expect(parseWebSocketProtocols(' app-v1, auth.token ,, client.id ')).toEqual([
-      'app-v1',
-      'auth.token',
-      'client.id',
-    ]);
+    expect(parseWebSocketProtocols(' app-v1, auth.token ,, client.id ')).toEqual(['app-v1', 'auth.token', 'client.id']);
   });
 
   it('extracts a valid authenticated offer', () => {

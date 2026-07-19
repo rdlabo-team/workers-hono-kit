@@ -22,7 +22,4 @@ export type {
   InvokeDurableObjectFetchOptions,
 } from './invoke.js';
 export { parseRealtimeWebSocketProtocolOffer, parseWebSocketProtocols } from './protocol.js';
-export type {
-  ParseRealtimeWebSocketProtocolOptions,
-  RealtimeWebSocketProtocolOffer,
-} from './protocol.js';
+export type { ParseRealtimeWebSocketProtocolOptions, RealtimeWebSocketProtocolOffer } from './protocol.js';

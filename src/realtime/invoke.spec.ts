@@ -4,7 +4,10 @@ import { DurableObjectResponseError, invokeDurableObjectFetch } from './invoke.j
 describe('invokeDurableObjectFetch', () => {
   it('creates a fresh stub and request for retryable idempotent attempts', async () => {
     const retryable = Object.assign(new Error('transient'), { retryable: true });
-    const fetches = [vi.fn().mockRejectedValue(retryable), vi.fn().mockResolvedValue(new Response(null, { status: 204 }))];
+    const fetches = [
+      vi.fn().mockRejectedValue(retryable),
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    ];
     const getStub = vi.fn(() => ({ fetch: fetches.shift()! }));
     const createRequest = vi.fn(() => ({ input: 'https://do/publish', init: { method: 'POST', body: '{}' } }));
 

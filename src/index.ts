@@ -102,10 +102,7 @@ export type {
   InvokeDurableObjectFetchOptions,
 } from './realtime/invoke.js';
 export { parseRealtimeWebSocketProtocolOffer, parseWebSocketProtocols } from './realtime/protocol.js';
-export type {
-  ParseRealtimeWebSocketProtocolOptions,
-  RealtimeWebSocketProtocolOffer,
-} from './realtime/protocol.js';
+export type { ParseRealtimeWebSocketProtocolOptions, RealtimeWebSocketProtocolOffer } from './realtime/protocol.js';
 
 // cache
 export { KVCache } from './cache/kv-cache.js';
