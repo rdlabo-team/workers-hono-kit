@@ -13,6 +13,7 @@ It provides the building blocks a NestJS-style API needs but that don't run on `
 - **Stripe** Workers-native client + async webhook verification.
 - **Payment failure & subscription reconcile**: provider-agnostic `payment_failed` helpers — Stripe decline reasons → Japanese messages, Apple / Google subscription-renewal classification, `iapFailureKey` / receipt (de)serialization, and Stripe reconcile branch decisions.
 - **Testing helpers** (`@rdlabo/workers-hono-kit/testing`): a Drizzle-migration-backed test database, in-memory Firebase fake, configurable test doubles, and Stripe fixtures.
+- **Realtime helpers**: Hibernation WebSocket upgrade/broadcast/close, legacy SSE bridging, and Durable Object retry policy.
 
 ## Install
 
@@ -82,6 +83,10 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 | `ErrorReporter` / `ErrorReportContext` | Types for a `reportError`-style unhandled-error reporter (e.g. wired to Sentry), paired with `createHttpErrorHandler`'s `onUnhandledError`. |
 | `createSentryErrorReporter(sentry)` / `SentryExceptionReporterLike` | Build an `ErrorReporter` that forwards to Sentry with an optional `request_id` tag (no hard `@sentry/cloudflare` dependency). |
 | `DeferExecutor` / `defaultDefer` / `createWaitUntilDefer(ctx)` | Fire-and-forget executor for Workers: `defaultDefer` swallows rejections (tests); `createWaitUntilDefer` registers work via `ctx.waitUntil`. |
+| `configureHibernationAutoResponse` / `upgradeHibernationWebSocket` / `broadcastHibernationWebSockets` | Hibernation WebSocket room primitives: runtime ping/pong without waking JavaScript, attachment-before-accept upgrade, and broadcast through sockets restored by `getWebSockets()`. |
+| `acknowledgeHibernationWebSocketClose` / `closeHibernationWebSocket` | Safe close helpers, including normalization of reserved received-only close codes. |
+| `createLegacySseBridge(options)` | Migration adapter from legacy SSE clients to one or more Hibernation WebSocket rooms. Downstream cancellation aborts pending upgrades and closes late-arriving sockets. |
+| `retryDurableObjectOperation(operation, options?)` / `isRetryableDurableObjectError(error)` | Retry idempotent DO work only for `retryable && !overloaded`, with jittered exponential backoff. `operation` runs per attempt so callers create a fresh stub after an exception. |
 | `createAiGatewayProvider(config)` / `AiGatewayConfig` / `AiGatewayProvider` | Route `@ai-sdk` models through the Cloudflare AI Gateway, via either a Workers `AI` binding or REST credentials (`accountId` / `gateway` / `token`). |
 | `KVCache` / `KVNamespace` / `KVCacheOptions` | Workers-KV cache-aside helper (key `appName+version+table_type_column`, sha256 for string ids, TTL clamped ≥60s). Set `appName` / `version` per application. |
 | `createStripeClient(secret, opts?)` / `verifyStripeWebhook(...)` / `CreateStripeClientOptions` | Workers-native Stripe client (fetch transport) + async webhook verification (SubtleCrypto). `apiVersion` optional (pin to a fixed Stripe API version). |

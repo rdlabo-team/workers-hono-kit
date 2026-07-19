@@ -77,6 +77,27 @@ export type { DeferExecutor } from './http/defer.js';
 export { createSentryErrorReporter } from './http/http-error.js';
 export type { SentryExceptionReporterLike } from './http/http-error.js';
 
+// realtime
+export {
+  acknowledgeHibernationWebSocketClose,
+  broadcastHibernationWebSockets,
+  closeHibernationWebSocket,
+  configureHibernationAutoResponse,
+  upgradeHibernationWebSocket,
+} from './realtime/hibernation.js';
+export type {
+  HibernationAutoResponseOptions,
+  HibernationUpgradeOptions,
+  HibernationWebSocketLike,
+  HibernationWebSocketStateLike,
+  WebSocketAutoResponsePairFactory,
+  WebSocketPairFactory,
+} from './realtime/hibernation.js';
+export { createLegacySseBridge } from './realtime/legacy-sse.js';
+export type { LegacySseBridgeOptions, RealtimeDurableObjectNamespaceLike } from './realtime/legacy-sse.js';
+export { isRetryableDurableObjectError, retryDurableObjectOperation } from './realtime/retry.js';
+export type { DurableObjectErrorLike, DurableObjectRetryOptions } from './realtime/retry.js';
+
 // cache
 export { KVCache } from './cache/kv-cache.js';
 export type { KVNamespace, KVCacheOptions } from './cache/kv-cache.js';
