@@ -59,6 +59,11 @@
       "import": "./dist/business-time/index.js",
       "default": "./dist/business-time/index.js"
     },
+    "./realtime": {
+      "types": "./dist/realtime/index.d.ts",
+      "import": "./dist/realtime/index.js",
+      "default": "./dist/realtime/index.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js",
