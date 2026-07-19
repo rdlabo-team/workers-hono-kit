@@ -12,6 +12,23 @@ function upgrade(socket: FakeSocket): Response {
 }
 
 describe('createLegacySseBridge', () => {
+  it('accepts a namespace with a concrete Durable Object ID type', () => {
+    interface ConcreteId {
+      value: string;
+    }
+    const namespace: RealtimeDurableObjectNamespaceLike<ConcreteId> = {
+      idFromName: (name) => ({ value: name }),
+      get: () => ({ fetch: () => Promise.resolve({ status: 500, webSocket: null } as unknown as Response) }),
+    };
+    const response = createLegacySseBridge({
+      namespace,
+      roomNames: [],
+      signal: new AbortController().signal,
+      protocol: 'realtime-v1',
+    });
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
+  });
+
   it('fans out upstream JSON messages as SSE data frames', async () => {
     const socket = new FakeSocket();
     const namespace = {

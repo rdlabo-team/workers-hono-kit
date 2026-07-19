@@ -1,7 +1,7 @@
 /** Minimal Durable Object namespace needed by the legacy SSE bridge. */
-export interface RealtimeDurableObjectNamespaceLike {
-  idFromName(name: string): unknown;
-  get(id: unknown): {
+export interface RealtimeDurableObjectNamespaceLike<TId = unknown> {
+  idFromName(name: string): TId;
+  get(id: TId): {
     fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
   };
 }
@@ -15,8 +15,8 @@ interface UpgradeResponse extends Response {
 }
 
 /** Options for bridging legacy SSE clients to Hibernation WebSocket rooms. */
-export interface LegacySseBridgeOptions {
-  namespace: RealtimeDurableObjectNamespaceLike;
+export interface LegacySseBridgeOptions<TId = unknown> {
+  namespace: RealtimeDurableObjectNamespaceLike<TId>;
   roomNames: readonly string[];
   signal: AbortSignal;
   protocol: string;
@@ -32,7 +32,7 @@ export interface LegacySseBridgeOptions {
  * The heartbeat lives in the outer Worker only; Durable Objects remain hibernatable. Aborting the
  * downstream request also aborts pending upgrades, including the late-upgrade race during teardown.
  */
-export function createLegacySseBridge(options: LegacySseBridgeOptions): Response {
+export function createLegacySseBridge<TId>(options: LegacySseBridgeOptions<TId>): Response {
   const encoder = new TextEncoder();
   const sockets = new Set<LegacyClientWebSocket>();
   const heartbeatMs = options.heartbeatMs ?? 25_000;
