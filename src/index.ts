@@ -77,6 +77,26 @@ export type { DeferExecutor } from './http/defer.js';
 export { createSentryErrorReporter } from './http/http-error.js';
 export type { SentryExceptionReporterLike } from './http/http-error.js';
 
+// idempotency
+export {
+  canonicalJson,
+  createIdempotencyInput,
+  IdempotencyConflictError,
+  IdempotencyInFlightError,
+  IdempotencyKeyValidationError,
+  runIdempotentMutation,
+  sha256CanonicalJson,
+  withIdempotencyHttpErrors,
+} from './idempotency/idempotency.js';
+export type {
+  CreateIdempotencyInputOptions,
+  IdempotencyInput,
+  IdempotencyReservation,
+  IdempotencyScope,
+  IdempotencyScopeValue,
+  IdempotentMutationStore,
+} from './idempotency/idempotency.js';
+
 // realtime
 export {
   acknowledgeHibernationWebSocketClose,

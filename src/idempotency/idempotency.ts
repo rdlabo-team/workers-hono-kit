@@ -1,0 +1,148 @@
+import { HTTPException } from 'hono/http-exception';
+
+/** Scalar values that may identify an idempotency scope. */
+export type IdempotencyScopeValue = string | number;
+
+/** A stable business scope for an idempotency key, such as user and tenant ids. */
+export type IdempotencyScope = Readonly<Record<string, IdempotencyScopeValue>>;
+
+/** Validated input persisted by an idempotency store. */
+export interface IdempotencyInput<TScope extends IdempotencyScope = IdempotencyScope> {
+  /** Caller-supplied idempotency key. */
+  key: string;
+  /** SHA-256 of the canonical request payload. */
+  payloadHash: string;
+  /** Application-defined isolation scope. */
+  scope: TScope;
+}
+
+/** Options used to validate an idempotency key and hash its payload. */
+export interface CreateIdempotencyInputOptions<TScope extends IdempotencyScope> {
+  /** Header value. `undefined` disables idempotency for backward compatibility. */
+  key: string | undefined;
+  /** Request payload whose semantic identity must remain stable across retries. */
+  payload: unknown;
+  /** Application-defined isolation scope. */
+  scope: TScope;
+  /** Maximum accepted key length. Defaults to 255. */
+  maxKeyLength?: number;
+}
+
+/** Raised when an idempotency key is empty or exceeds the configured limit. */
+export class IdempotencyKeyValidationError extends Error {
+  constructor(message = 'Invalid Idempotency-Key') {
+    super(message);
+    this.name = 'IdempotencyKeyValidationError';
+  }
+}
+
+/** Raised when a key is reused with a different canonical payload. */
+export class IdempotencyConflictError extends Error {
+  constructor(message = 'Idempotency-Key was already used with a different payload') {
+    super(message);
+    this.name = 'IdempotencyConflictError';
+  }
+}
+
+/** Raised when another request currently owns the same idempotency key. */
+export class IdempotencyInFlightError extends Error {
+  constructor(message = 'Idempotent request is still processing') {
+    super(message);
+    this.name = 'IdempotencyInFlightError';
+  }
+}
+
+/** Result returned by the store reservation step. */
+export type IdempotencyReservation<TResponse> = { kind: 'acquired' } | { kind: 'replay'; response: TResponse };
+
+/** Transaction-bound persistence operations required by {@link runIdempotentMutation}. */
+export interface IdempotentMutationStore<TScope extends IdempotencyScope, TResponse> {
+  /** Atomically reserve a key or return its previously completed response. */
+  reserve(input: IdempotencyInput<TScope>): Promise<IdempotencyReservation<TResponse>>;
+  /** Persist the mutation response in the same transaction as the domain write. */
+  complete(input: IdempotencyInput<TScope>, response: TResponse): Promise<void>;
+}
+
+/** Deterministically serialize JSON-like data with sorted object keys. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(',')}}`;
+  }
+  const serialized = JSON.stringify(value);
+  return typeof serialized === 'string' ? serialized : 'null';
+}
+
+/** Hash a value after canonical JSON serialization using the Workers Web Crypto API. */
+export async function sha256CanonicalJson(value: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(canonicalJson(value));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Validate an optional idempotency key and build its persistence input. */
+export async function createIdempotencyInput<TScope extends IdempotencyScope>(
+  options: CreateIdempotencyInputOptions<TScope>,
+): Promise<IdempotencyInput<TScope> | undefined> {
+  if (options.key === undefined) {
+    return undefined;
+  }
+  const maxKeyLength = options.maxKeyLength ?? 255;
+  if (options.key.length === 0 || options.key.length > maxKeyLength) {
+    throw new IdempotencyKeyValidationError();
+  }
+  return {
+    key: options.key,
+    payloadHash: await sha256CanonicalJson(options.payload),
+    scope: options.scope,
+  };
+}
+
+/**
+ * Execute a mutation with store-provided reservation and completion steps.
+ *
+ * @remarks
+ * The caller must bind `store` and `mutate` to the same database transaction. This function owns
+ * the state machine; the consuming application owns its schema and ORM adapter.
+ */
+export async function runIdempotentMutation<TScope extends IdempotencyScope, TResponse>(options: {
+  /** Optional input; omitted keys preserve legacy non-idempotent behavior. */
+  input: IdempotencyInput<TScope> | undefined;
+  /** Transaction-bound persistence adapter. */
+  store: IdempotentMutationStore<TScope, TResponse>;
+  /** Domain mutation executed only after this request acquires the key. */
+  mutate: () => Promise<TResponse>;
+}): Promise<TResponse> {
+  if (!options.input) {
+    return options.mutate();
+  }
+  const reservation = await options.store.reserve(options.input);
+  if (reservation.kind === 'replay') {
+    return reservation.response;
+  }
+  const response = await options.mutate();
+  await options.store.complete(options.input, response);
+  return response;
+}
+
+/** Map standard idempotency failures to Hono HTTP exceptions without hiding unrelated errors. */
+export async function withIdempotencyHttpErrors<T>(run: () => Promise<T>): Promise<T> {
+  return run().catch((error: unknown) => {
+    if (error instanceof IdempotencyKeyValidationError) {
+      throw new HTTPException(400, { message: error.message });
+    }
+    if (error instanceof IdempotencyConflictError) {
+      throw new HTTPException(409, { message: error.message });
+    }
+    if (error instanceof IdempotencyInFlightError) {
+      throw new HTTPException(503, { message: error.message });
+    }
+    throw error;
+  });
+}
