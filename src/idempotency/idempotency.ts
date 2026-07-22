@@ -6,6 +6,9 @@ export type IdempotencyScopeValue = string | number;
 /** A stable business scope for an idempotency key, such as user and tenant ids. */
 export type IdempotencyScope = Readonly<Record<string, IdempotencyScopeValue>>;
 
+/** Values accepted by an HTTP JSON request body after parsing. */
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
 /** Validated input persisted by an idempotency store. */
 export interface IdempotencyInput<TScope extends IdempotencyScope = IdempotencyScope> {
   /** Caller-supplied idempotency key. */
@@ -36,6 +39,14 @@ export class IdempotencyKeyValidationError extends Error {
   }
 }
 
+/** Raised when a payload contains a value that cannot be represented by JSON. */
+export class IdempotencyPayloadValidationError extends Error {
+  constructor(message = 'Idempotency payload must contain only JSON values') {
+    super(message);
+    this.name = 'IdempotencyPayloadValidationError';
+  }
+}
+
 /** Raised when a key is reused with a different canonical payload. */
 export class IdempotencyConflictError extends Error {
   constructor(message = 'Idempotency-Key was already used with a different payload') {
@@ -63,20 +74,28 @@ export interface IdempotentMutationStore<TScope extends IdempotencyScope, TRespo
   complete(input: IdempotencyInput<TScope>, response: TResponse): Promise<void>;
 }
 
-/** Deterministically serialize JSON-like data with sorted object keys. */
+/** Deterministically serialize JSON data with locale-independent, UTF-16 code-unit key ordering. */
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(',')}]`;
   }
   if (value !== null && typeof value === 'object') {
+    if (Object.getPrototypeOf(value) !== Object.prototype) {
+      throw new IdempotencyPayloadValidationError();
+    }
     return `{${Object.entries(value)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
       .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
       .join(',')}}`;
   }
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    throw new IdempotencyPayloadValidationError();
+  }
   const serialized = JSON.stringify(value);
-  return typeof serialized === 'string' ? serialized : 'null';
+  if (typeof serialized !== 'string') {
+    throw new IdempotencyPayloadValidationError();
+  }
+  return serialized;
 }
 
 /** Hash a value after canonical JSON serialization using the Workers Web Crypto API. */
@@ -134,7 +153,7 @@ export async function runIdempotentMutation<TScope extends IdempotencyScope, TRe
 /** Map standard idempotency failures to Hono HTTP exceptions without hiding unrelated errors. */
 export async function withIdempotencyHttpErrors<T>(run: () => Promise<T>): Promise<T> {
   return run().catch((error: unknown) => {
-    if (error instanceof IdempotencyKeyValidationError) {
+    if (error instanceof IdempotencyKeyValidationError || error instanceof IdempotencyPayloadValidationError) {
       throw new HTTPException(400, { message: error.message });
     }
     if (error instanceof IdempotencyConflictError) {

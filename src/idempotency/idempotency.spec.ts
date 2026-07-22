@@ -5,18 +5,27 @@ import {
   IdempotencyConflictError,
   IdempotencyInFlightError,
   IdempotencyKeyValidationError,
+  IdempotencyPayloadValidationError,
   runIdempotentMutation,
   sha256CanonicalJson,
   withIdempotencyHttpErrors,
 } from './idempotency.js';
 
 describe('idempotency standard', () => {
-  it('canonicalizes object key order and omits undefined values', async () => {
-    const left = { z: [2, { b: true, a: 'x' }], omitted: undefined, a: 1 };
-    const right = { a: 1, z: [2, { a: 'x', b: true }] };
+  it('canonicalizes object keys by locale-independent UTF-16 code-unit order', async () => {
+    const left = { あ: 3, z: [2, { b: true, a: 'x' }], ä: 2, a: 1 };
+    const right = { a: 1, z: [2, { a: 'x', b: true }], ä: 2, あ: 3 };
+    expect(canonicalJson(left)).toBe('{"a":1,"z":[2,{"a":"x","b":true}],"ä":2,"あ":3}');
     expect(canonicalJson(left)).toBe(canonicalJson(right));
     await expect(sha256CanonicalJson(left)).resolves.toBe(await sha256CanonicalJson(right));
   });
+
+  it.each([NaN, Infinity, { value: undefined }, new Date('2026-01-01')] as unknown[])(
+    'rejects non-JSON payload value %s instead of producing a colliding hash',
+    async (payload) => {
+      await expect(sha256CanonicalJson(payload)).rejects.toBeInstanceOf(IdempotencyPayloadValidationError);
+    },
+  );
 
   it('keeps missing keys backward compatible and validates supplied keys', async () => {
     await expect(
@@ -71,6 +80,7 @@ describe('idempotency standard', () => {
 
   it.each([
     [new IdempotencyKeyValidationError(), 400],
+    [new IdempotencyPayloadValidationError(), 400],
     [new IdempotencyConflictError(), 409],
     [new IdempotencyInFlightError(), 503],
   ])('maps %s to HTTP %s', async (error, status) => {
