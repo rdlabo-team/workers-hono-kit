@@ -87,10 +87,7 @@ function canonicalJsonValue(value: unknown, ancestors: Set<object>): string {
   if (Array.isArray(value)) {
     const keys = Reflect.ownKeys(value);
     const expectedKeys = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
-    if (
-      keys.length !== expectedKeys.size ||
-      keys.some((key) => typeof key !== 'string' || !expectedKeys.has(key))
-    ) {
+    if (keys.length !== expectedKeys.size || keys.some((key) => typeof key !== 'string' || !expectedKeys.has(key))) {
       throw new IdempotencyPayloadValidationError();
     }
     const items = Array.from({ length: value.length }, (_, index) => {
