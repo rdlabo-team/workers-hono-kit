@@ -61,6 +61,11 @@
       "import": "./dist/business-time/index.js",
       "default": "./dist/business-time/index.js"
     },
+    "./offline": {
+      "types": "./dist/offline/index.d.ts",
+      "import": "./dist/offline/index.js",
+      "default": "./dist/offline/index.js"
+    },
     "./realtime": {
       "types": "./dist/realtime/index.d.ts",
       "import": "./dist/realtime/index.js",
