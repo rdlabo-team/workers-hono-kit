@@ -32,6 +32,19 @@ describe('idempotency standard', () => {
     expect(() => canonicalJson(Array(1))).toThrow(IdempotencyPayloadValidationError);
   });
 
+  it('normalizes cyclic and throwing payloads to a validation error', () => {
+    const cyclic: { self?: unknown } = {};
+    cyclic.self = cyclic;
+    const throwing = Object.defineProperty({}, 'value', {
+      enumerable: true,
+      get: () => {
+        throw new Error('getter failed');
+      },
+    });
+    expect(() => canonicalJson(cyclic)).toThrow(IdempotencyPayloadValidationError);
+    expect(() => canonicalJson(throwing)).toThrow(IdempotencyPayloadValidationError);
+  });
+
   it('keeps missing keys backward compatible and validates supplied keys', async () => {
     await expect(
       createIdempotencyInput({ key: undefined, payload: {}, scope: { userId: 1 } }),

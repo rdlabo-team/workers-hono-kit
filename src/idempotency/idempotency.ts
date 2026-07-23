@@ -73,31 +73,49 @@ export interface IdempotentMutationStore<TScope extends IdempotencyScope, TRespo
 
 /** Deterministically serialize JSON data with locale-independent, UTF-16 code-unit key ordering. */
 export function canonicalJson(value: unknown): string {
+  try {
+    return canonicalJsonValue(value, new Set<object>());
+  } catch (error) {
+    if (error instanceof IdempotencyPayloadValidationError) {
+      throw error;
+    }
+    throw new IdempotencyPayloadValidationError();
+  }
+}
+
+function canonicalJsonValue(value: unknown, ancestors: Set<object>): string {
   if (Array.isArray(value)) {
     const keys = Object.keys(value);
     if (keys.length !== value.length || keys.some((key, index) => key !== String(index))) {
       throw new IdempotencyPayloadValidationError();
     }
-    return `[${value.map(canonicalJson).join(',')}]`;
+    if (ancestors.has(value)) {
+      throw new IdempotencyPayloadValidationError();
+    }
+    ancestors.add(value);
+    const serialized = `[${value.map((item) => canonicalJsonValue(item, ancestors)).join(',')}]`;
+    ancestors.delete(value);
+    return serialized;
   }
   if (value !== null && typeof value === 'object') {
     if (Object.getPrototypeOf(value) !== Object.prototype) {
       throw new IdempotencyPayloadValidationError();
     }
-    return `{${Object.entries(value)
+    if (ancestors.has(value)) {
+      throw new IdempotencyPayloadValidationError();
+    }
+    ancestors.add(value);
+    const serialized = `{${Object.entries(value)
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJsonValue(item, ancestors)}`)
       .join(',')}}`;
+    ancestors.delete(value);
+    return serialized;
   }
   if (typeof value === 'number' && !Number.isFinite(value)) {
     throw new IdempotencyPayloadValidationError();
   }
-  let serialized: string | undefined;
-  try {
-    serialized = JSON.stringify(value);
-  } catch {
-    throw new IdempotencyPayloadValidationError();
-  }
+  const serialized = JSON.stringify(value);
   if (typeof serialized !== 'string') {
     throw new IdempotencyPayloadValidationError();
   }
