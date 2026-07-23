@@ -11,4 +11,9 @@ export { fromTinyIntFlag, replicaTimestampMs, toReplicaDateOnly, toReplicaIsoDat
 export { replicaNowIso, systemReplicaClock, withoutReplicaId, withReplicaId } from './replica.js';
 export type { ReplicaClock } from './replica.js';
 export { defineRestDbMethodConverter } from './rest-db-method-converter.js';
-export type { RestDbMethodConverter, RestDbTableScheme } from './rest-db-method-converter.js';
+export type {
+  CompleteDbRow,
+  CompleteRestDbTableScheme,
+  RestDbMethodConverter,
+  RestDbTableScheme,
+} from './rest-db-method-converter.js';

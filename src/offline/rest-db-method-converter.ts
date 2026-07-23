@@ -7,17 +7,45 @@
  */
 export type RestDbTableScheme = object;
 
+/** Require every column represented by a product DB row type. */
+export type CompleteDbRow<TRow> = {
+  [TKey in keyof TRow]-?: TRow[TKey];
+};
+
+type CompleteDbTableValue<TValue> = TValue extends (infer TRow)[]
+  ? TRow extends object
+    ? CompleteDbRow<TRow>[]
+    : TValue
+  : TValue extends readonly (infer TRow)[]
+    ? TRow extends object
+      ? readonly CompleteDbRow<TRow>[]
+      : TValue
+    : TValue extends object
+      ? CompleteDbRow<TValue>
+      : TValue;
+
+/**
+ * Require every table key and every represented row column.
+ *
+ * This also makes optional `$inferInsert` columns explicit. A method that
+ * intentionally does not own a generated column must exclude it from its
+ * product-owned scheme first, for example `Omit<InsertRow, 'id'>`.
+ */
+export type CompleteRestDbTableScheme<TTableScheme extends RestDbTableScheme> = {
+  [TTableName in keyof TTableScheme]-?: CompleteDbTableValue<TTableScheme[TTableName]>;
+};
+
 /**
  * Pure, bidirectional conversion between one REST method type and the DB table
  * types participating in that method.
  *
- * Nullable DB columns remain required properties when their Drizzle type is
- * `T | null`: nullability does not make the property optional. Consequently,
- * an omitted column is caught by TypeScript in `toTableScheme`.
+ * Nullable/default DB columns remain required properties even when a Drizzle
+ * `$inferInsert` type marks them optional. Nullability does not make a column
+ * optional in the conversion contract.
  */
 export interface RestDbMethodConverter<TMethodScheme, TTableScheme extends RestDbTableScheme> {
-  toMethodScheme(tableScheme: Readonly<TTableScheme>): TMethodScheme;
-  toTableScheme(methodScheme: Readonly<TMethodScheme>): TTableScheme;
+  toMethodScheme(tableScheme: Readonly<CompleteRestDbTableScheme<TTableScheme>>): TMethodScheme;
+  toTableScheme(methodScheme: Readonly<TMethodScheme>): CompleteRestDbTableScheme<TTableScheme>;
 }
 
 /**

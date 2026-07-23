@@ -210,6 +210,7 @@ received from a server pull or successful mutation response; keep the client-gen
 | --- | --- |
 | `defineRestDbMethodConverter(converter)` | Type a product-owned, pure `MethodScheme ↔ TableScheme` converter without hiding HTTP or persistence side effects. |
 | `RestDbMethodConverter` / `RestDbTableScheme` | Converter and product table-bundle contracts. |
+| `CompleteDbRow` / `CompleteRestDbTableScheme` | Require every represented table and column, including optional nullable/default keys from `$inferInsert`. |
 | `toReplicaIsoDatetime(value)` | `Date` / datetime string → canonical UTC ISO-8601 wire value. |
 | `toReplicaDateOnly(value)` | `Date` / date string / `null` → canonical `YYYY-MM-DD` / `null`. |
 | `replicaTimestampMs(value)` | Replica datetime → epoch milliseconds for legacy DTOs. |
@@ -243,7 +244,23 @@ export const foodMethodConverter = defineRestDbMethodConverter<FoodMethodScheme,
     allergens: method.allergens.map((value) => ({ threadId: method.id, value })),
   }),
 });
+```
 
+`toTableScheme` requires every key represented by its DB row types. This includes nullable/default
+columns that Drizzle marks optional in `$inferInsert`; write `memo: method.memo ?? null` instead of
+omitting `memo`. If a REST method intentionally does not own an `AUTO_INCREMENT` column, remove it
+from that method's product-owned table scheme explicitly:
+
+```ts
+type CreateTables = {
+  foods: Omit<typeof foods.$inferInsert, 'id'>[];
+};
+```
+
+The converter then cannot demand or manufacture `id`; the server adds the generated id to the
+confirmed response before it is stored as `server_id`.
+
+```ts
 const values = withoutReplicaId({ id: 38142, name: 'Wine' });
 withReplicaId(values, 38142); // { id: 38142, name: 'Wine' }
 replicaNowIso(() => new Date('2026-07-23T10:00:00Z')); // '2026-07-23T10:00:00.000Z'

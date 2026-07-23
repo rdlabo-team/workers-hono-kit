@@ -1,3 +1,4 @@
+import { int, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import { describe, expect, it } from 'vitest';
 import {
   defineRestDbMethodConverter,
@@ -11,12 +12,14 @@ import {
   withReplicaId,
 } from './index.js';
 
-interface ExampleFoodRow {
-  id: number;
-  groupId: number;
-  name: string;
-  memo: string | null;
-}
+const _exampleFoods = mysqlTable('example_foods', {
+  id: int().autoincrement().primaryKey(),
+  groupId: int().notNull(),
+  name: varchar({ length: 200 }).notNull(),
+  memo: varchar({ length: 200 }),
+});
+
+type ExampleFoodInsert = typeof _exampleFoods.$inferInsert;
 
 interface ExampleAllergenRow {
   threadId: number;
@@ -32,7 +35,7 @@ interface ExampleFoodMethodScheme {
 }
 
 interface ExampleFoodTableScheme {
-  foods: ExampleFoodRow[];
+  foods: ExampleFoodInsert[];
   allergens: ExampleAllergenRow[];
 }
 
