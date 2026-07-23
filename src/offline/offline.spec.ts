@@ -91,6 +91,14 @@ describe('offline snapshot cursor', () => {
     'snapshot:v1:1:1.5:0',
     'snapshot:v1:1:0:not-a-number',
     'snapshot:v1:1:0:0:extra',
+    'snapshot:v1:::',
+    'snapshot:v1:1::0',
+    'snapshot:v1:1:  :0',
+    'snapshot:v1:1:1e2:0',
+    'snapshot:v1:1:+2:0',
+    'snapshot:v1:1:-0:0',
+    'snapshot:v1:01:0:0',
+    'snapshot:v1:9007199254740992:0:0',
   ])('rejects malformed cursor %j', (value) => {
     expect(decodeOfflineSnapshotCursor(value)).toBeNull();
   });
