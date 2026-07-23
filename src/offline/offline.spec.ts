@@ -1,6 +1,8 @@
 import { int, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import { describe, expect, it } from 'vitest';
 import {
+  decodeOfflineSnapshotCursor,
+  encodeOfflineSnapshotCursor,
   defineRestDbMethodConverter,
   fromTinyIntFlag,
   replicaNowIso,
@@ -73,6 +75,28 @@ describe('offline replica wire helpers', () => {
 describe('offline replica clock helper', () => {
   it('uses an injectable wall clock', () => {
     expect(replicaNowIso(() => new Date('2026-07-23T10:00:00.456Z'))).toBe('2026-07-23T10:00:00.456Z');
+  });
+});
+
+describe('offline snapshot cursor', () => {
+  it('round-trips the journal watermark and keyset position', () => {
+    const value = { watermark: 38142, sourceIndex: 2, afterId: 99 };
+    expect(decodeOfflineSnapshotCursor(encodeOfflineSnapshotCursor(value))).toEqual(value);
+  });
+
+  it.each([
+    '',
+    'snapshot:v2:1:0:0',
+    'snapshot:v1:-1:0:0',
+    'snapshot:v1:1:1.5:0',
+    'snapshot:v1:1:0:not-a-number',
+    'snapshot:v1:1:0:0:extra',
+  ])('rejects malformed cursor %j', (value) => {
+    expect(decodeOfflineSnapshotCursor(value)).toBeNull();
+  });
+
+  it('refuses to encode invalid positions', () => {
+    expect(() => encodeOfflineSnapshotCursor({ watermark: 1, sourceIndex: -1, afterId: 0 })).toThrow(RangeError);
   });
 });
 
