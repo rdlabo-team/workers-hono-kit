@@ -39,6 +39,16 @@ interface ExampleFoodTableScheme {
   allergens: ExampleAllergenRow[];
 }
 
+interface ExampleCreateFoodMethodScheme {
+  groupId: number;
+  name: string;
+  memo: string | null;
+}
+
+interface ExampleCreateFoodTableScheme {
+  foods: Omit<ExampleFoodInsert, 'id'>[];
+}
+
 describe('offline replica wire helpers', () => {
   it('normalizes datetime instants to canonical UTC ISO strings', () => {
     expect(toReplicaIsoDatetime('2026-07-23T19:00:00+09:00')).toBe('2026-07-23T10:00:00.000Z');
@@ -115,6 +125,10 @@ describe('REST DB method converter', () => {
       allergens: method.allergens.map((value) => ({ threadId: method.id, value })),
     }),
   });
+  const createConverter = defineRestDbMethodConverter<ExampleCreateFoodMethodScheme, ExampleCreateFoodTableScheme>({
+    toMethodScheme: ({ foods }) => foods[0],
+    toTableScheme: (method) => ({ foods: [{ ...method }] }),
+  });
 
   it('converts one REST method scheme to and from all participating tables', () => {
     const tables = converter.toTableScheme({
@@ -151,5 +165,11 @@ describe('REST DB method converter', () => {
       });
     };
     void compileOnly;
+  });
+
+  it('omits an AUTO_INCREMENT id only when the product method scheme excludes it explicitly', () => {
+    expect(createConverter.toTableScheme({ groupId: 7, name: 'Wine', memo: null })).toEqual({
+      foods: [{ groupId: 7, name: 'Wine', memo: null }],
+    });
   });
 });
