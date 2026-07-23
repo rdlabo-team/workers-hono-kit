@@ -20,12 +20,17 @@ describe('idempotency standard', () => {
     await expect(sha256CanonicalJson(left)).resolves.toBe(await sha256CanonicalJson(right));
   });
 
-  it.each([NaN, Infinity, { value: undefined }, new Date('2026-01-01')] as unknown[])(
+  it.each([NaN, Infinity, 1n, { value: undefined }, new Date('2026-01-01'), Array(1)] as unknown[])(
     'rejects non-JSON payload value %s instead of producing a colliding hash',
     async (payload) => {
       await expect(sha256CanonicalJson(payload)).rejects.toBeInstanceOf(IdempotencyPayloadValidationError);
     },
   );
+
+  it('does not collide a sparse array with an empty JSON array', () => {
+    expect(canonicalJson([])).toBe('[]');
+    expect(() => canonicalJson(Array(1))).toThrow(IdempotencyPayloadValidationError);
+  });
 
   it('keeps missing keys backward compatible and validates supplied keys', async () => {
     await expect(

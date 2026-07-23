@@ -5,10 +5,8 @@
  * should use their exported Drizzle `$inferSelect` / `$inferInsert` types here;
  * this package deliberately knows no table names or columns.
  */
-export type RestDbTableScheme = object;
-
 /** Require every column represented by a product DB row type. */
-export type CompleteDbRow<TRow> = {
+type CompleteDbRow<TRow> = {
   [TKey in keyof TRow]-?: TRow[TKey];
 };
 
@@ -31,7 +29,7 @@ type CompleteDbTableValue<TValue> = TValue extends (infer TRow)[]
  * intentionally does not own a generated column must exclude it from its
  * product-owned scheme first, for example `Omit<InsertRow, 'id'>`.
  */
-export type CompleteRestDbTableScheme<TTableScheme extends RestDbTableScheme> = {
+type CompleteRestDbTableScheme<TTableScheme extends object> = {
   [TTableName in keyof TTableScheme]-?: CompleteDbTableValue<TTableScheme[TTableName]>;
 };
 
@@ -43,7 +41,7 @@ export type CompleteRestDbTableScheme<TTableScheme extends RestDbTableScheme> = 
  * `$inferInsert` type marks them optional. Nullability does not make a column
  * optional in the conversion contract.
  */
-export interface RestDbMethodConverter<TMethodScheme, TTableScheme extends RestDbTableScheme> {
+export interface RestDbMethodConverter<TMethodScheme, TTableScheme extends object> {
   toMethodScheme(tableScheme: Readonly<CompleteRestDbTableScheme<TTableScheme>>): TMethodScheme;
   toTableScheme(methodScheme: Readonly<TMethodScheme>): CompleteRestDbTableScheme<TTableScheme>;
 }
@@ -54,7 +52,7 @@ export interface RestDbMethodConverter<TMethodScheme, TTableScheme extends RestD
  * This is intentionally an identity function: conversion remains explicit,
  * synchronous, and free of hidden persistence or HTTP side effects.
  */
-export function defineRestDbMethodConverter<TMethodScheme, TTableScheme extends RestDbTableScheme>(
+export function defineRestDbMethodConverter<TMethodScheme, TTableScheme extends object>(
   converter: RestDbMethodConverter<TMethodScheme, TTableScheme>,
 ): RestDbMethodConverter<TMethodScheme, TTableScheme> {
   return converter;

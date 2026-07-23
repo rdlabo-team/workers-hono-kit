@@ -84,6 +84,7 @@ export {
   IdempotencyConflictError,
   IdempotencyInFlightError,
   IdempotencyKeyValidationError,
+  IdempotencyPayloadValidationError,
   runIdempotentMutation,
   sha256CanonicalJson,
   withIdempotencyHttpErrors,

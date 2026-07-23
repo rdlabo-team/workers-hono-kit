@@ -8,8 +8,6 @@ import {
   toReplicaDateOnly,
   toReplicaIsoDatetime,
   toTinyIntFlag,
-  withoutReplicaId,
-  withReplicaId,
 } from './index.js';
 
 const _exampleFoods = mysqlTable('example_foods', {
@@ -72,32 +70,9 @@ describe('offline replica wire helpers', () => {
   });
 });
 
-describe('offline replica identity and clock helpers', () => {
+describe('offline replica clock helper', () => {
   it('uses an injectable wall clock', () => {
     expect(replicaNowIso(() => new Date('2026-07-23T10:00:00.456Z'))).toBe('2026-07-23T10:00:00.456Z');
-  });
-
-  it('removes and restores an id without knowing product columns', () => {
-    const values = withoutReplicaId({ id: 38142, name: 'Wine', nullable: null });
-    expect(values).toEqual({ name: 'Wine', nullable: null });
-    expect(withReplicaId(values, 38142)).toEqual({ id: 38142, name: 'Wine', nullable: null });
-  });
-
-  it('does not allow local values to override the supplied replica id', () => {
-    expect(withReplicaId({ id: 1, name: 'Wine' } as never, 38142)).toEqual({
-      id: 38142,
-      name: 'Wine',
-    });
-  });
-
-  it('rejects an id inside typed local values', () => {
-    const compileOnly = (): void => {
-      // @ts-expect-error local values must not carry a remote replica id
-      withReplicaId({ id: 1, name: 'Wine' }, 38142);
-      // @ts-expect-error a remote replica id is required and is never generated locally
-      withReplicaId({ name: 'Wine' });
-    };
-    void compileOnly;
   });
 });
 

@@ -8,12 +8,6 @@
  */
 
 export { fromTinyIntFlag, replicaTimestampMs, toReplicaDateOnly, toReplicaIsoDatetime, toTinyIntFlag } from './wire.js';
-export { replicaNowIso, systemReplicaClock, withoutReplicaId, withReplicaId } from './replica.js';
-export type { ReplicaClock } from './replica.js';
+export { replicaNowIso } from './clock.js';
 export { defineRestDbMethodConverter } from './rest-db-method-converter.js';
-export type {
-  CompleteDbRow,
-  CompleteRestDbTableScheme,
-  RestDbMethodConverter,
-  RestDbTableScheme,
-} from './rest-db-method-converter.js';
+export type { RestDbMethodConverter } from './rest-db-method-converter.js';

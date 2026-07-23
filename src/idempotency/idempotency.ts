@@ -6,9 +6,6 @@ export type IdempotencyScopeValue = string | number;
 /** A stable business scope for an idempotency key, such as user and tenant ids. */
 export type IdempotencyScope = Readonly<Record<string, IdempotencyScopeValue>>;
 
-/** Values accepted by an HTTP JSON request body after parsing. */
-export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-
 /** Validated input persisted by an idempotency store. */
 export interface IdempotencyInput<TScope extends IdempotencyScope = IdempotencyScope> {
   /** Caller-supplied idempotency key. */
@@ -77,6 +74,10 @@ export interface IdempotentMutationStore<TScope extends IdempotencyScope, TRespo
 /** Deterministically serialize JSON data with locale-independent, UTF-16 code-unit key ordering. */
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
+    const keys = Object.keys(value);
+    if (keys.length !== value.length || keys.some((key, index) => key !== String(index))) {
+      throw new IdempotencyPayloadValidationError();
+    }
     return `[${value.map(canonicalJson).join(',')}]`;
   }
   if (value !== null && typeof value === 'object') {
@@ -91,7 +92,12 @@ export function canonicalJson(value: unknown): string {
   if (typeof value === 'number' && !Number.isFinite(value)) {
     throw new IdempotencyPayloadValidationError();
   }
-  const serialized = JSON.stringify(value);
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new IdempotencyPayloadValidationError();
+  }
   if (typeof serialized !== 'string') {
     throw new IdempotencyPayloadValidationError();
   }
