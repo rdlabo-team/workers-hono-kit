@@ -44,6 +44,7 @@ npm install ai ai-gateway-provider    # createAiGatewayProvider
 > | `.` | `@rdlabo/workers-hono-kit` | Web-standard helpers (middleware, HTTP, Firebase, AWS, AI, Stripe, KV). |
 > | `./db` | `@rdlabo/workers-hono-kit/db` | MySQL data layer (mysql2 + Drizzle). |
 > | `./business-time` | `@rdlabo/workers-hono-kit/business-time` | JST business-time API (`toBusinessDateTime` / `normalizeBusinessDate` / `formatBusinessDateTime`, etc.). |
+> | `./offline` | `@rdlabo/workers-hono-kit/offline` | Table-agnostic offline replica wire, identity, and clock helpers. |
 > | `./testing` | `@rdlabo/workers-hono-kit/testing` | Test helpers (mysql2 + Drizzle + fakes/fixtures). |
 
 ## API
@@ -190,6 +191,37 @@ toBusinessDate(now); // '2026-07-06' (JST)
 toBusinessDateTime(now); // '2026-07-06 06:00:00'
 formatBusinessDateTime(now); // '2026-07-06T06:00:00'
 addBusinessDays('2026-07-06', 3); // '2026-07-09'
+```
+
+### Offline replicas — `@rdlabo/workers-hono-kit/offline`
+
+Table-agnostic building blocks for product-owned offline replica converters. This subpath does not
+define table projections, Zod object shapes, public-column allowlists, schema hashes, or domain
+rules; those remain in each Hono application.
+
+| Export | Description |
+| --- | --- |
+| `toReplicaIsoDatetime(value)` | `Date` / datetime string → canonical UTC ISO-8601 wire value. |
+| `toReplicaDateOnly(value)` | `Date` / date string / `null` → canonical `YYYY-MM-DD` / `null`. |
+| `replicaTimestampMs(value)` | Replica datetime → epoch milliseconds for legacy DTOs. |
+| `toTinyIntFlag(value)` / `fromTinyIntFlag(value)` | Boolean-like value ↔ numeric tinyint flag. |
+| `replicaNowIso(clock?)` | Injectable wall clock → canonical UTC ISO-8601 wire value. |
+| `systemReplicaClock` / `ReplicaClock` | Default system clock and its injectable function type. |
+| `withoutReplicaId(replica)` | Shallowly remove the remote `id` without knowing product columns. |
+| `withReplicaId(values, id)` | Shallowly attach the remote `id` to validated product-owned values. |
+
+```ts
+import {
+  replicaNowIso,
+  toReplicaIsoDatetime,
+  withoutReplicaId,
+  withReplicaId,
+} from '@rdlabo/workers-hono-kit/offline';
+
+const values = withoutReplicaId({ id: 38142, name: 'Wine' });
+withReplicaId(values, 38142); // { id: 38142, name: 'Wine' }
+replicaNowIso(() => new Date('2026-07-23T10:00:00Z')); // '2026-07-23T10:00:00.000Z'
+toReplicaIsoDatetime('2026-07-23T19:00:00+09:00'); // '2026-07-23T10:00:00.000Z'
 ```
 
 ### Testing — `@rdlabo/workers-hono-kit/testing`
