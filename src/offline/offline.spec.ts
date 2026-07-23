@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  defineRestDbMethodConverter,
   fromTinyIntFlag,
   replicaNowIso,
   replicaTimestampMs,
@@ -9,6 +10,31 @@ import {
   withoutReplicaId,
   withReplicaId,
 } from './index.js';
+
+interface ExampleFoodRow {
+  id: number;
+  groupId: number;
+  name: string;
+  memo: string | null;
+}
+
+interface ExampleAllergenRow {
+  threadId: number;
+  value: string;
+}
+
+interface ExampleFoodMethodScheme {
+  id: number;
+  groupId: number;
+  name: string;
+  memo?: string;
+  allergens: string[];
+}
+
+interface ExampleFoodTableScheme {
+  foods: ExampleFoodRow[];
+  allergens: ExampleAllergenRow[];
+}
 
 describe('offline replica wire helpers', () => {
   it('normalizes datetime instants to canonical UTC ISO strings', () => {
@@ -57,6 +83,69 @@ describe('offline replica identity and clock helpers', () => {
       withReplicaId({ id: 1, name: 'Wine' }, 38142);
       // @ts-expect-error a remote replica id is required and is never generated locally
       withReplicaId({ name: 'Wine' });
+    };
+    void compileOnly;
+  });
+});
+
+describe('REST DB method converter', () => {
+  const converter = defineRestDbMethodConverter<ExampleFoodMethodScheme, ExampleFoodTableScheme>({
+    toMethodScheme: ({ foods, allergens }) => {
+      const food = foods[0];
+      return {
+        id: food.id,
+        groupId: food.groupId,
+        name: food.name,
+        ...(food.memo === null ? {} : { memo: food.memo }),
+        allergens: allergens.filter((row) => row.threadId === food.id).map((row) => row.value),
+      };
+    },
+    toTableScheme: (method) => ({
+      foods: [
+        {
+          id: method.id,
+          groupId: method.groupId,
+          name: method.name,
+          memo: method.memo ?? null,
+        },
+      ],
+      allergens: method.allergens.map((value) => ({ threadId: method.id, value })),
+    }),
+  });
+
+  it('converts one REST method scheme to and from all participating tables', () => {
+    const tables = converter.toTableScheme({
+      id: 38142,
+      groupId: 7,
+      name: 'Wine',
+      allergens: ['milk', 'egg'],
+    });
+
+    expect(tables).toEqual({
+      foods: [{ id: 38142, groupId: 7, name: 'Wine', memo: null }],
+      allergens: [
+        { threadId: 38142, value: 'milk' },
+        { threadId: 38142, value: 'egg' },
+      ],
+    });
+    expect(converter.toMethodScheme(tables)).toEqual({
+      id: 38142,
+      groupId: 7,
+      name: 'Wine',
+      allergens: ['milk', 'egg'],
+    });
+  });
+
+  it('requires nullable DB columns to be present in the table scheme', () => {
+    const compileOnly = (): void => {
+      defineRestDbMethodConverter<ExampleFoodMethodScheme, ExampleFoodTableScheme>({
+        toMethodScheme: () => ({ id: 1, groupId: 1, name: 'Wine', allergens: [] }),
+        toTableScheme: (method) => ({
+          // @ts-expect-error memo is nullable, not optional
+          foods: [{ id: method.id, groupId: method.groupId, name: method.name }],
+          allergens: [],
+        }),
+      });
     };
     void compileOnly;
   });

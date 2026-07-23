@@ -195,7 +195,8 @@ addBusinessDays('2026-07-06', 3); // '2026-07-09'
 
 ### Offline replicas — `@rdlabo/workers-hono-kit/offline`
 
-Table-agnostic building blocks for product-owned offline replica converters. This subpath does not
+Table-agnostic building blocks for product-owned REST ↔ DB method converters and their offline
+replica wire values. This subpath does not
 define table projections, Zod object shapes, public-column allowlists, schema hashes, or domain
 rules; those remain in each Hono application.
 
@@ -207,6 +208,8 @@ received from a server pull or successful mutation response; keep the client-gen
 
 | Export | Description |
 | --- | --- |
+| `defineRestDbMethodConverter(converter)` | Type a product-owned, pure `MethodScheme ↔ TableScheme` converter without hiding HTTP or persistence side effects. |
+| `RestDbMethodConverter` / `RestDbTableScheme` | Converter and product table-bundle contracts. |
 | `toReplicaIsoDatetime(value)` | `Date` / datetime string → canonical UTC ISO-8601 wire value. |
 | `toReplicaDateOnly(value)` | `Date` / date string / `null` → canonical `YYYY-MM-DD` / `null`. |
 | `replicaTimestampMs(value)` | Replica datetime → epoch milliseconds for legacy DTOs. |
@@ -218,11 +221,28 @@ received from a server pull or successful mutation response; keep the client-gen
 
 ```ts
 import {
+  defineRestDbMethodConverter,
   replicaNowIso,
   toReplicaIsoDatetime,
   withoutReplicaId,
   withReplicaId,
 } from '@rdlabo/workers-hono-kit/offline';
+
+type Tables = {
+  foods: FoodRow[];
+  allergens: AllergenRow[];
+};
+
+export const foodMethodConverter = defineRestDbMethodConverter<FoodMethodScheme, Tables>({
+  toMethodScheme: ({ foods, allergens }) => ({
+    ...foods[0],
+    allergens: allergens.map(({ value }) => value),
+  }),
+  toTableScheme: (method) => ({
+    foods: [{ id: method.id, memo: method.memo ?? null }],
+    allergens: method.allergens.map((value) => ({ threadId: method.id, value })),
+  }),
+});
 
 const values = withoutReplicaId({ id: 38142, name: 'Wine' });
 withReplicaId(values, 38142); // { id: 38142, name: 'Wine' }
