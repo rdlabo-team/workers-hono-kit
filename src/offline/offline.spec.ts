@@ -55,6 +55,8 @@ describe('offline replica identity and clock helpers', () => {
     const compileOnly = (): void => {
       // @ts-expect-error local values must not carry a remote replica id
       withReplicaId({ id: 1, name: 'Wine' }, 38142);
+      // @ts-expect-error a remote replica id is required and is never generated locally
+      withReplicaId({ name: 'Wine' });
     };
     void compileOnly;
   });

@@ -199,6 +199,12 @@ Table-agnostic building blocks for product-owned offline replica converters. Thi
 define table projections, Zod object shapes, public-column allowlists, schema hashes, or domain
 rules; those remain in each Hono application.
 
+This is an additive subpath: existing root and subpath exports are unchanged. Consumers can migrate
+converter internals independently without changing REST payloads, schema hashes, or persisted SQLite
+rows. `withReplicaId` never allocates an identity. For an `AUTO_INCREMENT` table, pass only an `id`
+received from a server pull or successful mutation response; keep the client-generated UUID in
+`local_id` and keep `server_id` null until confirmation.
+
 | Export | Description |
 | --- | --- |
 | `toReplicaIsoDatetime(value)` | `Date` / datetime string → canonical UTC ISO-8601 wire value. |

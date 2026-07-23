@@ -39,6 +39,8 @@ export function withoutReplicaId<T extends { id: unknown }>(replica: T): Omit<T,
  *
  * This helper performs no schema validation; the consuming product remains
  * responsible for its table-derived runtime schema.
+ * It never allocates an identity. For an AUTO_INCREMENT table, `id` must come
+ * from a server pull or a successful mutation response, never from the client.
  *
  * @param values - Product-owned local values.
  * @param id - Remote identity assigned by the server.
