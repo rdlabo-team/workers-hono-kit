@@ -45,6 +45,17 @@ describe('idempotency standard', () => {
     expect(() => canonicalJson(throwing)).toThrow(IdempotencyPayloadValidationError);
   });
 
+  it('rejects own properties that JSON would silently omit', () => {
+    const objectWithSymbol = { [Symbol('hidden')]: 1 };
+    const arrayWithSymbol = Object.assign([], { [Symbol('hidden')]: 1 });
+    const objectWithNonEnumerable = Object.defineProperty({}, 'hidden', { value: 1 });
+    const arrayWithNonEnumerable = Object.defineProperty([], 'hidden', { value: 1 });
+
+    for (const value of [objectWithSymbol, arrayWithSymbol, objectWithNonEnumerable, arrayWithNonEnumerable]) {
+      expect(() => canonicalJson(value)).toThrow(IdempotencyPayloadValidationError);
+    }
+  });
+
   it('keeps missing keys backward compatible and validates supplied keys', async () => {
     await expect(
       createIdempotencyInput({ key: undefined, payload: {}, scope: { userId: 1 } }),

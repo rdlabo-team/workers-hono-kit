@@ -85,15 +85,26 @@ export function canonicalJson(value: unknown): string {
 
 function canonicalJsonValue(value: unknown, ancestors: Set<object>): string {
   if (Array.isArray(value)) {
-    const keys = Object.keys(value);
-    if (keys.length !== value.length || keys.some((key, index) => key !== String(index))) {
+    const keys = Reflect.ownKeys(value);
+    const expectedKeys = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+    if (
+      keys.length !== expectedKeys.size ||
+      keys.some((key) => typeof key !== 'string' || !expectedKeys.has(key))
+    ) {
       throw new IdempotencyPayloadValidationError();
     }
+    const items = Array.from({ length: value.length }, (_, index) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        throw new IdempotencyPayloadValidationError();
+      }
+      return descriptor.value as unknown;
+    });
     if (ancestors.has(value)) {
       throw new IdempotencyPayloadValidationError();
     }
     ancestors.add(value);
-    const serialized = `[${value.map((item) => canonicalJsonValue(item, ancestors)).join(',')}]`;
+    const serialized = `[${items.map((item) => canonicalJsonValue(item, ancestors)).join(',')}]`;
     ancestors.delete(value);
     return serialized;
   }
@@ -104,8 +115,18 @@ function canonicalJsonValue(value: unknown, ancestors: Set<object>): string {
     if (ancestors.has(value)) {
       throw new IdempotencyPayloadValidationError();
     }
+    const entries = Reflect.ownKeys(value).map((key): [string, unknown] => {
+      if (typeof key !== 'string') {
+        throw new IdempotencyPayloadValidationError();
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        throw new IdempotencyPayloadValidationError();
+      }
+      return [key, descriptor.value as unknown];
+    });
     ancestors.add(value);
-    const serialized = `{${Object.entries(value)
+    const serialized = `{${entries
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
       .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJsonValue(item, ancestors)}`)
       .join(',')}}`;
