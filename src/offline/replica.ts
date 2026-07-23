@@ -44,6 +44,9 @@ export function withoutReplicaId<T extends { id: unknown }>(replica: T): Omit<T,
  * @param id - Remote identity assigned by the server.
  * @returns A shallow replica object with `id`.
  */
-export function withReplicaId<TValues extends object, TId>(values: TValues, id: TId): TValues & { id: TId } {
-  return { id, ...values };
+export function withReplicaId<TValues extends object, TId>(
+  values: 'id' extends keyof TValues ? never : TValues,
+  id: TId,
+): TValues & { id: TId } {
+  return { ...values, id };
 }

@@ -43,4 +43,19 @@ describe('offline replica identity and clock helpers', () => {
     expect(values).toEqual({ name: 'Wine', nullable: null });
     expect(withReplicaId(values, 38142)).toEqual({ id: 38142, name: 'Wine', nullable: null });
   });
+
+  it('does not allow local values to override the supplied replica id', () => {
+    expect(withReplicaId({ id: 1, name: 'Wine' } as never, 38142)).toEqual({
+      id: 38142,
+      name: 'Wine',
+    });
+  });
+
+  it('rejects an id inside typed local values', () => {
+    const compileOnly = (): void => {
+      // @ts-expect-error local values must not carry a remote replica id
+      withReplicaId({ id: 1, name: 'Wine' }, 38142);
+    };
+    void compileOnly;
+  });
 });
